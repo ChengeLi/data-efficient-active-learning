@@ -198,3 +198,19 @@ Fri Jan 13 01:49:10 2023 Epoch 196, lr: 0.0000002, val loss: 65.10424, acc: 79.6
 Fri Jan 13 01:50:11 2023 Epoch 197, lr: 0.0000002, val loss: 65.10601, acc: 79.60000
 Fri Jan 13 01:51:11 2023 Epoch 198, lr: 0.0000001, val loss: 65.11542, acc: 79.60000
 Fri Jan 13 01:52:12 2023 Epoch 199, lr: 0.0000001, val loss: 65.12694, acc: 79.60000
+
+wandb: Run history:
+wandb:      epoch ▁▁▁▁▂▂▂▂▂▃▃▃▃▃▃▄▄▄▄▄▅▅▅▅▅▅▆▆▆▆▆▇▇▇▇▇▇███
+wandb: epoch_time ▁▁▇▆▇▇▇▆▇█▇▇█▇▇▇█▆▇▇▇▇▇▇█▇▇▇▇▇▇██▇▇▇█▇▇▇
+wandb:         lr ████████▇▇▇▇▇▆▆▆▆▅▅▅▄▄▄▄▃▃▃▃▂▂▂▂▂▁▁▁▁▁▁▁
+wandb: train_loss █▆▅▅▄▄▄▄▃▃▃▃▃▂▂▂▂▂▂▂▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:    val_acc ▁▃▄▄▅▅▆▆▆▆▇▇▇▇▇▇▇▇▇▇████████████████████
+wandb:   val_loss █▆▅▅▄▄▃▃▃▃▂▂▂▂▂▂▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:
+wandb: Run summary:
+wandb:      epoch 199
+wandb: epoch_time 61.12145
+wandb:         lr 0.0
+wandb: train_loss 0.47007
+wandb:    val_acc 79.6
+wandb:   val_loss 65.12694
