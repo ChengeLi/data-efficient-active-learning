@@ -174,6 +174,7 @@ n_test = len(Y_te)
 print('number of labeled pool: {}'.format(NUM_INIT_LB), flush=True)
 print('number of unlabeled pool: {}'.format(n_pool - NUM_INIT_LB), flush=True)
 print('number of testing pool: {}'.format(n_test), flush=True)
+print('Testing batch size: {}'.format(args_pool['CIFAR10']['loader_te_args']['batch_size']), flush=True)
 
 # generate initial labeled pool
 idxs_lb = np.zeros(n_pool, dtype=bool)

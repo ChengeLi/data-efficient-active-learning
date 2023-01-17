@@ -20,6 +20,7 @@ class Strategy:
         self.args = args
         self.n_pool = len(Y)
         use_cuda = torch.cuda.is_available()
+        print(use_cuda)
 
     def query(self, n):
         pass
@@ -60,7 +61,8 @@ class Strategy:
         loader_tr = DataLoader(self.handler(self.X[idxs_train], torch.Tensor(self.Y.numpy()[idxs_train]).long(), transform=self.args['transform']), shuffle=True, **self.args['loader_tr_args'])
         if len(data) > 0:
             loader_tr = DataLoader(self.handler(data[0], torch.Tensor(data[1]).long(), transform=self.args['transform']), shuffle=True, **self.args['loader_tr_args'])
-
+        # epoch, attempts (early stopping), training accuracy
+        print('epoch, attempts, training accuracy:, acc', flush=True)
         epoch = 1
         accCurrent = 0.
         bestAcc = 0.
