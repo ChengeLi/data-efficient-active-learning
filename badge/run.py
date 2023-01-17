@@ -174,6 +174,7 @@ n_test = len(Y_te)
 print('number of labeled pool: {}'.format(NUM_INIT_LB), flush=True)
 print('number of unlabeled pool: {}'.format(n_pool - NUM_INIT_LB), flush=True)
 print('number of testing pool: {}'.format(n_test), flush=True)
+print('number of rounds: {}'.format(NUM_ROUND), flush=True)
 print('Testing batch size: {}'.format(args_pool['CIFAR10']['loader_te_args']['batch_size']), flush=True)
 
 # generate initial labeled pool
@@ -293,7 +294,7 @@ for rd in range(1, NUM_ROUND+1):
 
     # update
     strategy.update(idxs_lb)
-    strategy.train(verbose=False)
+    strategy.train(verbose=True)
 
     # round accuracy
     P = strategy.predict(X_te, Y_te)
