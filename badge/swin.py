@@ -4,7 +4,7 @@ from torchvision.models import swin_v2_t
 
 
 class MyCustomSwinTiny(nn.Module):
-    def __init__(self, pretrained):
+    def __init__(self, input_channel, pretrained=False):
         super().__init__()
         if pretrained:
             from torchvision.models import Swin_V2_T_Weights
@@ -21,6 +21,9 @@ class MyCustomSwinTiny(nn.Module):
         # so you cant do sth like self.features(images). Therefore we use
         # nn.Sequential and since sequential doesnt accept lists, we
         # unpack all the items and send them like this
+        if input_channel == 1:
+            self.features[0][0][0] = nn.Conv2d(input_channel, 96, kernel_size=(4, 4), stride=(4, 4))
+
         self.features = nn.Sequential(*self.features)
         self.embDim = 768
         # now lets add our new layers
