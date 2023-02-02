@@ -87,7 +87,7 @@ class BaitHypSampling(Strategy):
         super(BaitHypSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
 
     def query(self, n):
-        # TODO: Implement UMAP and Hyperbolic projection
+        # TODO: see if Fisher transformation makes sense in hyperbolic space
         # compute get_exp_grad for all unlabeled
         # Perform hyp -> transforms to a hyperbolic embedding
         # Run Kmeans to get clusters and sample association
@@ -96,16 +96,3 @@ class BaitHypSampling(Strategy):
 
         pass
 
-class HypBadgeSampling(Strategy):
-    def __init__(self, X, Y, idxs_lb, net, handler, args):
-        super(HypBadgeSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
-
-    def query(self, n):
-        # TODO: Implement UMAP and Hyperbolic projection
-        # compute hyp-emb for all unlabeled
-        # get_grad
-        # Run Kmeans to get clusters and sample association
-        # chosen = init_centers(gradEmbedding, n)
-
-
-        pass
