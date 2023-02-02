@@ -49,5 +49,6 @@ class MyCustomSwinTiny(nn.Module):
         output = self.classifier(emb)
 
         return output, emb
+
     def get_embedding_dim(self):
         return self.embDim

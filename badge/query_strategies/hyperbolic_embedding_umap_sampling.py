@@ -1,10 +1,17 @@
 import numpy as np
 import pdb
 import torch
+from matplotlib import pyplot as plt
 from scipy import stats
 from sklearn.metrics import pairwise_distances
-
 from .strategy import Strategy
+import umap
+# hyperparams
+from ..manifolds import Hyperboloid
+
+PROJ_EPS = 1e-3
+EPS = 1e-15
+MAX_TANH_ARG = 15.0
 
 # kmeans ++ initialization
 def init_centers(X, K):
@@ -35,19 +42,42 @@ def init_centers(X, K):
         cent += 1
     return indsAll
 
-def hyp_transformation(emb):
-    pass
+
 
 class HypUmapSampleing(Strategy):
     def __init__(self, X, Y, idxs_lb, net, handler, args):
         super(HypUmapSampleing, self).__init__(X, Y, idxs_lb, net, handler, args)
+        self.manifold = Hyperboloid()
+        self.curvature = 1/15 # based on plot 4 in HGCN paper
 
     def query(self, n):
         # TODO: Implement UMAP and Hyperbolic projection
+        # Get embedding for all data
+        embedding = self.get_embedding(self.X, self.Y)
+        # Transform to Hyperboloid model of hyperbolic space
+        hypEmbedding = self.manifold.expmap0(embedding, self.curvature)
+        # Train UMAP on all hyperbolic embeddings
+        hyperbolic_mapper = umap.UMAP(output_metric='hyperboloid',metric='minkowski',
+                                      random_state=42,tqdm_kwds={'disable':False}).fit(hypEmbedding)
+        plt.scatter(hyperbolic_mapper.embedding_.T[0],
+                    hyperbolic_mapper.embedding_.T[1],
+                    c=self.Y, cmap='Spectral')
+        x = hyperbolic_mapper.embedding_[:, 0]
+        y = hyperbolic_mapper.embedding_[:, 1]
+        z = np.sqrt(1 + np.sum(hyperbolic_mapper.embedding_ ** 2, axis=1))
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        ax.scatter(x, y, z, c=self.Y, cmap='Spectral')
+        ax.view_init(35, 80)
+        plt.show()
         # compute hyp-emb for all unlabeled
+        idxs_unlabeled = np.arange(self.n_pool)[~self.idxs_lb]
+        hyperbolic_embedding_unlabeled = hyperbolic_mapper.embedding_[idxs_unlabeled]
         # Perform UMAP -> transforms to a lower dimension
+        # hypUmapEmbedding = UMAP(hypEmbedding)
         # Run Kmeans to get clusters and sample association
-        # chosen = init_centers(gradEmbedding, n)
+        chosen = init_centers_hyp(hyperbolic_embedding_unlabeled, n)
+        return idxs_unlabeled[chosen]
 
 
         pass
@@ -58,7 +88,7 @@ class BaitHypSampling(Strategy):
 
     def query(self, n):
         # TODO: Implement UMAP and Hyperbolic projection
-        # compute geg_exp_grad for all unlabeled
+        # compute get_exp_grad for all unlabeled
         # Perform hyp -> transforms to a hyperbolic embedding
         # Run Kmeans to get clusters and sample association
         # chosen = init_centers(gradEmbedding, n)

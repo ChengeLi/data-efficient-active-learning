@@ -10,6 +10,7 @@ import argparse
 # from torch.nn import Linear, Sequential
 
 import swin
+from badge.query_strategies.hyperbolic_embedding_umap_sampling import HypUmapSampleing
 from dataset import get_dataset, get_handler
 # from model import get_net
 import vgg
@@ -90,14 +91,14 @@ args_pool = {'MNIST':
                                                                             (0.2470, 0.2435, 0.2616))])}
              }
 opts.nClasses = 10
-if opts.model == 'swin_t':
-    args_pool['CIFAR10']['transform'] = transforms.Compose([
-        transforms.RandomCrop(32, padding=4),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)),
-        # should I change this to the values for Swin_V2_t? (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)
-        transforms.Resize((256, 256))])
+# if opts.model == 'swin_t':
+#     args_pool['CIFAR10']['transform'] = transforms.Compose([
+#         transforms.RandomCrop(32, padding=4),
+#         transforms.RandomHorizontalFlip(),
+#         transforms.ToTensor(),
+#         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)),
+#         # should I change this to the values for Swin_V2_t? (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)
+#         transforms.Resize((256, 256))])
 
 if opts.aug == 0:
     args_pool['CIFAR10']['transform'] = args_pool['CIFAR10']['transformTest']  # remove data augmentation
@@ -237,7 +238,7 @@ elif opts.model == 'swin_t':
     if opts.data == 'MNIST':
         net = swin.MyCustomSwinTiny(input_channel=1)
     else:
-        net = swin.MyCustomSwinTiny(input_channel=3, pretrained=True)
+        net = swin.MyCustomSwinTiny(input_channel=3) #, pretrained=True
 else:
     print('choose a valid model - mlp, resnet, or vgg', flush=True)
     raise ValueError
@@ -260,6 +261,13 @@ elif opts.alg == 'marg':  # margin-based sampling
     strategy = MarginSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'badge':  # batch active learning by diverse gradient embeddings
     strategy = BadgeSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
+elif opts.alg == 'hypUmap':  # batch active learning by diverse gradient embeddings
+    strategy = HypUmapSampleing(X_tr, Y_tr, idxs_lb, net, handler, args)
+elif opts.alg == 'badge':  # batch active learning by diverse gradient embeddings
+    strategy = BadgeSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
+elif opts.alg == 'badge':  # batch active learning by diverse gradient embeddings
+    strategy = BadgeSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
+
 elif opts.alg == 'coreset':  # coreset sampling
     strategy = CoreSet(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'entropy':  # entropy-based sampling

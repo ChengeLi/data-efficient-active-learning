@@ -370,4 +370,7 @@ class Strategy:
                         else: embedding[idxs[j]][ind] = embedding[idxs[j]][ind] * np.sqrt(batchProbs[j][ind])
         return torch.Tensor(embedding)
 
+    def get_hyp_umap_embedding(self, X, Y, model=[]):
+        pass
+
 
