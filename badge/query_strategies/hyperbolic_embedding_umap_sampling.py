@@ -86,7 +86,7 @@ class HypUmapSampleing(Strategy):
         # Perform UMAP -> transforms to a lower dimension
         # hypUmapEmbedding = UMAP(hypEmbedding)
         # Run Kmeans to get clusters and sample association
-        chosen = init_centers(hyperbolic_mapper_to_euclidean[idxs_unlabeled], n)
+        chosen = init_centers(hyperbolic_mapper_to_euclidean.embedding_[idxs_unlabeled], n)
         return idxs_unlabeled[chosen]
 
 
