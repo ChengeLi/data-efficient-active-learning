@@ -6,8 +6,9 @@ from scipy import stats
 from sklearn.metrics import pairwise_distances
 from .strategy import Strategy
 import umap
+import umap.plot
 # hyperparams
-from ..manifolds import Hyperboloid
+from manifolds import Hyperboloid
 
 PROJ_EPS = 1e-3
 EPS = 1e-15
@@ -57,26 +58,35 @@ class HypUmapSampleing(Strategy):
         # Transform to Hyperboloid model of hyperbolic space
         hypEmbedding = self.manifold.expmap0(embedding, self.curvature)
         # Train UMAP on all hyperbolic embeddings
-        hyperbolic_mapper = umap.UMAP(output_metric='hyperboloid',metric='minkowski',
-                                      random_state=42,tqdm_kwds={'disable':False}).fit(hypEmbedding)
-        plt.scatter(hyperbolic_mapper.embedding_.T[0],
-                    hyperbolic_mapper.embedding_.T[1],
-                    c=self.Y, cmap='Spectral')
-        x = hyperbolic_mapper.embedding_[:, 0]
-        y = hyperbolic_mapper.embedding_[:, 1]
-        z = np.sqrt(1 + np.sum(hyperbolic_mapper.embedding_ ** 2, axis=1))
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-        ax.scatter(x, y, z, c=self.Y, cmap='Spectral')
-        ax.view_init(35, 80)
-        plt.show()
+        # hyperbolic_mapper = umap.UMAP(n_components=10,n_neighbors=5,output_metric='hyperboloid',metric='minkowski',
+        #                               random_state=42,tqdm_kwds={'disable':False}).fit(hypEmbedding)
+        hyperbolic_mapper_to_euclidean = umap.UMAP(n_components=10, n_neighbors=5, output_metric='euclidean', metric='minkowski',
+                                      random_state=42, tqdm_kwds={'disable': False}).fit(hypEmbedding)
+        # plt.scatter(hyperbolic_mapper.embedding_.T[0],
+        #             hyperbolic_mapper.embedding_.T[1],
+        #             c=self.Y, cmap='Spectral')
+        # x = hyperbolic_mapper.embedding_[:, 0]
+        # y = hyperbolic_mapper.embedding_[:, 1]
+        # z = np.sqrt(1 + np.sum(hyperbolic_mapper.embedding_ ** 2, axis=1))
+        # fig = plt.figure()
+        # ax = fig.add_subplot(111, projection='3d')
+        # ax.scatter(x, y, z, c=self.Y, cmap='Spectral')
+        # ax.view_init(35, 80)
+        # plt.show()
+        # umap.plot.points(hyperbolic_mapper, labels=self.Y)
+        # umap.plot.plt.show()
+
         # compute hyp-emb for all unlabeled
         idxs_unlabeled = np.arange(self.n_pool)[~self.idxs_lb]
-        hyperbolic_embedding_unlabeled = hyperbolic_mapper.embedding_[idxs_unlabeled]
+        # hyperbolic_embedding_unlabeled = hyperbolic_mapper.embedding_[idxs_unlabeled]
+        # embedding_unlabeled = self.manifold.logmap0(torch.tensor(hyperbolic_embedding_unlabeled), self.curvature).numpy()
+
+
+
         # Perform UMAP -> transforms to a lower dimension
         # hypUmapEmbedding = UMAP(hypEmbedding)
         # Run Kmeans to get clusters and sample association
-        chosen = init_centers_hyp(hyperbolic_embedding_unlabeled, n)
+        chosen = init_centers(hyperbolic_mapper_to_euclidean[idxs_unlabeled], n)
         return idxs_unlabeled[chosen]
 
 

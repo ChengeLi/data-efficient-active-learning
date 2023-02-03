@@ -7,8 +7,8 @@ import pdb
 
 from scipy import stats
 
-from badge.manifolds.base import Manifold
-from badge.manifolds.utils.math_utils import arcosh, cosh, sinh, p_root
+from manifolds.base import Manifold
+from manifolds.utils.math_utils import arcosh, cosh, sinh, p_root
 
 
 class Hyperboloid(Manifold):

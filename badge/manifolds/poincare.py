@@ -2,8 +2,8 @@
 
 import torch
 
-from badge.manifolds.base import Manifold
-from badge.manifolds.utils.math_utils import artanh, tanh
+from manifolds.base import Manifold
+from manifolds.utils.math_utils import artanh, tanh
 
 
 class PoincareBall(Manifold):

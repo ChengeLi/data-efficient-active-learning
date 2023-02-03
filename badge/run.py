@@ -10,7 +10,7 @@ import argparse
 # from torch.nn import Linear, Sequential
 
 import swin
-from badge.query_strategies.hyperbolic_embedding_umap_sampling import HypUmapSampleing
+from query_strategies.hyperbolic_embedding_umap_sampling import HypUmapSampleing
 from dataset import get_dataset, get_handler
 # from model import get_net
 import vgg
