@@ -20,6 +20,7 @@ import torch.nn.functional as F
 from torch import nn
 from torchvision import transforms
 import torch
+import random
 # import time
 # import pdb
 # from scipy.stats import zscore
@@ -49,6 +50,9 @@ parser.add_argument('--dummy', help='dummy input for indexing replicates', type=
 opts = parser.parse_args()
 print(opts, flush=True)
 
+torch.manual_seed(10)
+random.seed(10)
+np.random.seed(10)
 # parameters
 NUM_INIT_LB = opts.nStart
 NUM_QUERY = opts.nQuery
