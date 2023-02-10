@@ -1,5 +1,7 @@
 # PyCharm
 .idea
+.DS_Store
+badge/.DS_Store
 
 # Folders
 wandb/
