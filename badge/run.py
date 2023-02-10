@@ -10,9 +10,10 @@ import argparse
 # from torch.nn import Linear, Sequential
 
 import swin
-from query_strategies.hyperbolic_embedding_umap_sampling import HypUmapSampleing
+from query_strategies.hyperbolic_embedding_umap_sampling import HypUmapSampleing, HypNetBadgeSampling
 from dataset import get_dataset, get_handler
 # from model import get_net
+from model import HyperNet
 import vgg
 import resnet
 from sklearn.preprocessing import LabelEncoder
@@ -22,12 +23,12 @@ from torchvision import transforms
 import torch
 import random
 # import time
-# import pdb
+import pdb
 # from scipy.stats import zscore
 from query_strategies import RandomSampling, BadgeSampling, \
     BaselineSampling, LeastConfidence, MarginSampling, \
-    EntropySampling, ActiveLearningByLearning, BaitSampling, CoreSet  # , , ActiveLearningByLearning, \
-
+    EntropySampling, ActiveLearningByLearning, BaitSampling, CoreSet
+# , , ActiveLearningByLearning, \
 # LeastConfidenceDropout, MarginSamplingDropout, EntropySamplingDropout, \
 # KMeansSampling, KCenterGreedy, BALDDropout, CoreSet, \
 # AdversarialBIM, AdversarialDeepFool,
@@ -65,8 +66,8 @@ opts.lamb = 1
 args_pool = {'MNIST':
                  {'n_epoch': 10,
                   'transform': transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]),
-                  'loader_tr_args': {'batch_size': 64, 'num_workers': 1},
-                  'loader_te_args': {'batch_size': 1000, 'num_workers': 1},
+                  'loader_tr_args': {'batch_size': 256, 'num_workers': 0},
+                  'loader_te_args': {'batch_size': 1000, 'num_workers': 0},
                   'optimizer_args': {'lr': 0.01, 'momentum': 0.5}},
              'FashionMNIST':
                  {'n_epoch': 10,
@@ -179,7 +180,8 @@ print('number of labeled pool: {}'.format(NUM_INIT_LB), flush=True)
 print('number of unlabeled pool: {}'.format(n_pool - NUM_INIT_LB), flush=True)
 print('number of testing pool: {}'.format(n_test), flush=True)
 print('number of rounds: {}'.format(NUM_ROUND), flush=True)
-print('Testing batch size: {}'.format(args_pool['CIFAR10']['loader_te_args']['batch_size']), flush=True)
+print('Training batch size: {}'.format(args_pool[opts.data]['loader_tr_args']['batch_size']), flush=True)
+print('Testing batch size: {}'.format(args_pool[opts.data]['loader_te_args']['batch_size']), flush=True)
 
 # generate initial labeled pool
 idxs_lb = np.zeros(n_pool, dtype=bool)
@@ -243,6 +245,9 @@ elif opts.model == 'swin_t':
         net = swin.MyCustomSwinTiny(input_channel=1)
     else:
         net = swin.MyCustomSwinTiny(input_channel=3) #, pretrained=True
+elif opts.model == 'HyperNet':
+    print('Using hypernet')
+    net = HyperNet()
 else:
     print('choose a valid model - mlp, resnet, or vgg', flush=True)
     raise ValueError
@@ -267,11 +272,8 @@ elif opts.alg == 'badge':  # batch active learning by diverse gradient embedding
     strategy = BadgeSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'hypUmap':  # batch active learning by diverse gradient embeddings
     strategy = HypUmapSampleing(X_tr, Y_tr, idxs_lb, net, handler, args)
-elif opts.alg == 'badge':  # batch active learning by diverse gradient embeddings
-    strategy = BadgeSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
-elif opts.alg == 'badge':  # batch active learning by diverse gradient embeddings
-    strategy = BadgeSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
-
+elif opts.alg == 'hypNetBadge':
+    strategy = HypNetBadgeSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'coreset':  # coreset sampling
     strategy = CoreSet(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'entropy':  # entropy-based sampling
@@ -294,7 +296,7 @@ print(type(strategy).__name__, flush=True)
 if type(X_te) == torch.Tensor: X_te = X_te.numpy()
 
 # round 0 accuracy
-strategy.train()
+strategy.train(model_selection=opts.model)
 P = strategy.predict(X_te, Y_te)
 acc = np.zeros(NUM_ROUND + 1)
 acc[0] = 1.0 * (Y_te == P).sum().item() / len(Y_te)
@@ -314,7 +316,7 @@ for rd in range(1, NUM_ROUND + 1):
 
     # update
     strategy.update(idxs_lb)
-    strategy.train(verbose=True)
+    strategy.train(verbose=True, model_selection=opts.model)
 
     # round accuracy
     P = strategy.predict(X_te, Y_te)
