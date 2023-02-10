@@ -44,7 +44,6 @@ def init_centers(X, K):
     return indsAll
 
 
-
 class HypUmapSampleing(Strategy):
     def __init__(self, X, Y, idxs_lb, net, handler, args):
         super(HypUmapSampleing, self).__init__(X, Y, idxs_lb, net, handler, args)
@@ -99,10 +98,27 @@ class BaitHypSampling(Strategy):
     def query(self, n):
         # TODO: see if Fisher transformation makes sense in hyperbolic space
         # compute get_exp_grad for all unlabeled
-        # Perform hyp -> transforms to a hyperbolic embedding
+        pass
+
+
+class HypNetBadgeSampling(Strategy):
+    """
+        use hyperbolic layer as last layer,
+        use normal cross entropy as BADGE
+    """
+    def __init__(self, X, Y, idxs_lb, net, handler, args):
+        super(HypNetBadgeSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
+
+    def query(self, n):
+        # compute hyp-emb for all unlabeled
+        # get_grad
         # Run Kmeans to get clusters and sample association
         # chosen = init_centers(gradEmbedding, n)
 
+        idxs_unlabeled = np.arange(self.n_pool)[~self.idxs_lb]
+        gradEmbedding = self.get_grad_embedding_for_hyperNet(self.X[idxs_unlabeled], self.Y.numpy()[idxs_unlabeled]).numpy()
+        chosen = init_centers(gradEmbedding, n)
+        return idxs_unlabeled[chosen]
 
-        pass
+
 

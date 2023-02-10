@@ -28,6 +28,9 @@ class Strategy:
     def update(self, idxs_lb):
         self.idxs_lb = idxs_lb
 
+    def enable_multiple_gpu_model(self, clf):
+        return torch.nn.DataParallel(clf)
+
     def _train(self, epoch, loader_tr, optimizer):
         self.clf.train()
         accFinal = 0.
@@ -45,8 +48,27 @@ class Strategy:
 
         return accFinal / len(loader_tr.dataset.X), loss.item()
 
+
+    def _hyper_train(self, epoch, loader_tr, optimizer):
+        self.clf.train()
+        accFinal = 0.
+        for batch_idx, (x, y, idxs) in enumerate(loader_tr):
+            x, y = Variable(x.cuda()), Variable(y.cuda())
+            optimizer.zero_grad()
+            out, _ = self.clf(x)
+            out = F.log_softmax(out, dim=-1)
+            loss = F.nll_loss(out, y)
+            accFinal += torch.sum((torch.max(out,1)[1] == y).float()).data.item()
+            loss.backward()
+
+            # clamp gradients, just in case
+            for p in filter(lambda p: p.grad is not None, self.clf.parameters()): p.grad.data.clamp_(min=-.1, max=.1)
+            optimizer.step()
+
+        return accFinal / len(loader_tr.dataset.X), loss.item()
+
  
-    def train(self, reset=True, optimizer=0, verbose=True, data=[], net=[]):
+    def train(self, reset=True, optimizer=0, verbose=True, data=[], net=[], model_selection=None):
         def weight_reset(m):
             newLayer = deepcopy(m)
             if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
@@ -67,14 +89,21 @@ class Strategy:
         accCurrent = 0.
         bestAcc = 0.
         attempts = 0
-        while accCurrent < 0.99: 
-            accCurrent, lossCurrent = self._train(epoch, loader_tr, optimizer)
+        # while accCurrent < 0.99:
+        while epoch < 100 and accCurrent < 0.99: #train for 50 epoches at most
+            if not isinstance(self.clf, nn.DataParallel):
+                print('enabling multiple gpus')
+                self.clf = self.enable_multiple_gpu_model(self.clf)
+            if model_selection == 'HyperNet':
+                accCurrent, lossCurrent = self._hyper_train(epoch, loader_tr, optimizer)
+            else:
+                accCurrent, lossCurrent = self._train(epoch, loader_tr, optimizer)
             if bestAcc < accCurrent:
                 bestAcc = accCurrent
                 attempts = 0
             else: attempts += 1
             epoch += 1
-            if verbose: print(str(epoch) + ' ' + str(attempts) + ' training accuracy: ' + str(accCurrent), flush=True)
+            if verbose: print(str(epoch) + '_' + str(attempts) + ' training accuracy: ' + str(accCurrent), flush=True)
             # reset if not converging
             if (epoch % 1000 == 0) and (accCurrent < 0.2) and (self.args['modelType'] != 'linear'):
                 self.clf = self.net.apply(weight_reset)
@@ -319,8 +348,11 @@ class Strategy:
     def get_grad_embedding(self, X, Y, model=[]):
         if type(model) == list:
             model = self.clf
-        
-        embDim = model.get_embedding_dim()
+
+        if isinstance(model, nn.DataParallel):
+            embDim = model.module.get_embedding_dim()
+        else:
+            embDim = model.get_embedding_dim()
         model.eval()
         nLab = len(np.unique(Y))
         embedding = np.zeros([len(Y), embDim * nLab])
@@ -370,7 +402,82 @@ class Strategy:
                         else: embedding[idxs[j]][ind] = embedding[idxs[j]][ind] * np.sqrt(batchProbs[j][ind])
         return torch.Tensor(embedding)
 
-    def get_hyp_umap_embedding(self, X, Y, model=[]):
-        pass
 
 
+    def get_grad_embedding_for_hyperNet(self, X, Y, model=[]):
+        if type(model) == list:
+            model = self.clf
+
+        if isinstance(model, nn.DataParallel):
+            embDim = model.module.get_embedding_dim()
+        else:
+            embDim = model.get_embedding_dim()
+        model.eval()
+        nLab = len(np.unique(Y))
+        embedding = np.zeros([len(Y), embDim * nLab])
+        loader_te = DataLoader(self.handler(X, Y, transform=self.args['transformTest']),
+                            shuffle=False, **self.args['loader_te_args'])
+        with torch.no_grad():
+            for x, y, idxs in loader_te:
+                x, y = Variable(x.cuda()), Variable(y.cuda())
+                cout, out = model(x) #mlr is after hyperbolic softmax
+                out = out.data.cpu().numpy()
+                batchProbs = F.softmax(cout, dim=1).data.cpu().numpy()
+                maxInds = np.argmax(batchProbs,1)
+                for j in range(len(y)):
+                    for c in range(nLab):
+                        if c == maxInds[j]:
+                            embedding[idxs[j]][embDim * c : embDim * (c+1)] = deepcopy(out[j]) * (1 - batchProbs[j][c])
+                        else:
+                            embedding[idxs[j]][embDim * c : embDim * (c+1)] = deepcopy(out[j]) * (-1 * batchProbs[j][c])
+            return torch.Tensor(embedding)
+
+
+    def hyp_transformation(emb):
+        import hyptorch.nn as hypnn
+        ## hyperparameters
+        dim = 2 #"Dimension of the Poincare ball"
+        c = 1.0 #"Curvature of the Poincare ball"
+        train_x = False # train the exponential map origin
+        train_c = False # train the Poincare ball curvature
+
+        tp = hypnn.ToPoincare(
+                c=c, train_x=train_x, train_c=train_c, ball_dim=dim
+            )
+        hyper_emb = tp(emb)
+        return hyper_emb
+
+
+
+    # gradient embedding for badge (assumes cross-entropy loss)
+    def get_grad_embedding_hyperbolic_feature(self, X, Y, model=[]):
+        """
+        the only difference with BADGE is we transform the feature in euclidean space to poincre ball first
+        """
+        if type(model) == list:
+            model = self.clf
+        
+        embDim = model.get_embedding_dim()
+        model.eval()
+        nLab = len(np.unique(Y))
+        embedding = np.zeros([len(Y), embDim * nLab])
+        loader_te = DataLoader(self.handler(X, Y, transform=self.args['transformTest']),
+                            shuffle=False, **self.args['loader_te_args'])
+        with torch.no_grad():
+            for x, y, idxs in loader_te:
+                x, y = Variable(x.cuda()), Variable(y.cuda())
+                cout, out = model(x)
+
+                ### here's the hyperbolic transformation
+                out = hyp_transformation(out)
+
+                out = out.data.cpu().numpy()
+                batchProbs = F.softmax(cout, dim=1).data.cpu().numpy()
+                maxInds = np.argmax(batchProbs,1)
+                for j in range(len(y)):
+                    for c in range(nLab):
+                        if c == maxInds[j]:
+                            embedding[idxs[j]][embDim * c : embDim * (c+1)] = deepcopy(out[j]) * (1 - batchProbs[j][c])
+                        else:
+                            embedding[idxs[j]][embDim * c : embDim * (c+1)] = deepcopy(out[j]) * (-1 * batchProbs[j][c])
+            return torch.Tensor(embedding)

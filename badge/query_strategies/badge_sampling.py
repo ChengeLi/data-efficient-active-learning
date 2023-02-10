@@ -40,7 +40,12 @@ import numpy as np
 # from sklearn.metrics.pairwise import rbf_kernel as rbf
 # #from sklearn.externals.six import string_types
 # from sklearn.exceptions import ConvergenceWarning
+
+from sklearnex import patch_sklearn
+patch_sklearn()
 from sklearn.metrics import pairwise_distances
+import pdb
+from time import time
 
 # kmeans ++ initialization
 def init_centers(X, K):
@@ -50,6 +55,7 @@ def init_centers(X, K):
     centInds = [0.] * len(X)
     cent = 0
     print('#Samps\tTotal Distance')
+    t1 = time()
     while len(mu) < K:
         if len(mu) == 1:
             D2 = pairwise_distances(X, mu).ravel().astype(float)
@@ -69,6 +75,8 @@ def init_centers(X, K):
         mu.append(X[ind])
         indsAll.append(ind)
         cent += 1
+    t2 = time()
+    print(f'init centers took {t2-t1} seconds')
     return indsAll
 
 class BadgeSampling(Strategy):
