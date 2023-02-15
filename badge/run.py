@@ -6,11 +6,13 @@ import pickle
 # import openml
 import os
 import argparse
-
+from tqdm import tqdm
 # from torch.nn import Linear, Sequential
 
 import swin
-from query_strategies.hyperbolic_embedding_umap_sampling import HypUmapSampleing, HypNetBadgeSampling
+from query_strategies.util import create_directory
+from query_strategies.hyperbolic_embedding_umap_sampling import HypUmapSampleing, HypNetBadgeSampling, \
+    UmapHypKmeansSampleing
 from dataset import get_dataset, get_handler
 # from model import get_net
 from model import HyperNet
@@ -61,7 +63,7 @@ NUM_ROUND = int((opts.nEnd - NUM_INIT_LB) / opts.nQuery)
 DATA_NAME = opts.data
 # regularization settings for bait
 opts.lamb = 1
-
+visualize_embedding = True
 # non-openml data defaults
 args_pool = {'MNIST':
                  {'n_epoch': 10,
@@ -96,14 +98,14 @@ args_pool = {'MNIST':
                                                                             (0.2470, 0.2435, 0.2616))])}
              }
 opts.nClasses = 10
-# if opts.model == 'swin_t':
-#     args_pool['CIFAR10']['transform'] = transforms.Compose([
-#         transforms.RandomCrop(32, padding=4),
-#         transforms.RandomHorizontalFlip(),
-#         transforms.ToTensor(),
-#         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)),
-#         # should I change this to the values for Swin_V2_t? (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)
-#         transforms.Resize((256, 256))])
+if opts.model == 'swin_t':
+    args_pool['CIFAR10']['transform'] = transforms.Compose([
+        transforms.RandomCrop(32, padding=4),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+        # should I change this to the values for Swin_V2_t? (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)
+        transforms.Resize((256, 256))])
 
 if opts.aug == 0:
     args_pool['CIFAR10']['transform'] = args_pool['CIFAR10']['transformTest']  # remove data augmentation
@@ -229,7 +231,8 @@ class mlpMod(nn.Module):
     def get_embedding_dim(self):
         return self.embSize
 
-
+args['output_dir'] = os.path.join('./badge/output', opts.model+ '_' + opts.alg)
+create_directory(args['output_dir'])
 # load specified network
 if opts.model == 'mlp':
     net = mlpMod(opts.dim, embSize=opts.nEmb)
@@ -244,7 +247,7 @@ elif opts.model == 'swin_t':
     if opts.data == 'MNIST':
         net = swin.MyCustomSwinTiny(input_channel=1)
     else:
-        net = swin.MyCustomSwinTiny(input_channel=3) #, pretrained=True
+        net = swin.MyCustomSwinTiny(input_channel=3, pretrained=True) #, pretrained=True
 elif opts.model == 'HyperNet':
     print('Using hypernet')
     net = HyperNet()
@@ -272,6 +275,8 @@ elif opts.alg == 'badge':  # batch active learning by diverse gradient embedding
     strategy = BadgeSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'hypUmap':  # batch active learning by diverse gradient embeddings
     strategy = HypUmapSampleing(X_tr, Y_tr, idxs_lb, net, handler, args)
+elif opts.alg == 'UmapHypKmeans':  # batch active learning by diverse gradient embeddings
+    strategy = UmapHypKmeansSampleing(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'hypNetBadge':
     strategy = HypNetBadgeSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'coreset':  # coreset sampling
@@ -294,15 +299,18 @@ print(DATA_NAME, flush=True)
 print(type(strategy).__name__, flush=True)
 
 if type(X_te) == torch.Tensor: X_te = X_te.numpy()
-
+results = []
 # round 0 accuracy
-strategy.train(model_selection=opts.model)
+strategy.train(verbose=False,model_selection=opts.model)
 P = strategy.predict(X_te, Y_te)
 acc = np.zeros(NUM_ROUND + 1)
 acc[0] = 1.0 * (Y_te == P).sum().item() / len(Y_te)
 print(str(opts.nStart) + '\ttesting accuracy {}'.format(acc[0]), flush=True)
+results.append([sum(idxs_lb), acc[0]])
 
-for rd in range(1, NUM_ROUND + 1):
+
+for rd in tqdm(range(1, NUM_ROUND + 1)):
+    print('')
     print('Round {}'.format(rd), flush=True)
     torch.cuda.empty_cache()
     gc.collect()
@@ -316,11 +324,32 @@ for rd in range(1, NUM_ROUND + 1):
 
     # update
     strategy.update(idxs_lb)
-    strategy.train(verbose=True, model_selection=opts.model)
+    strategy.train(verbose=False, model_selection=opts.model)
 
     # round accuracy
     P = strategy.predict(X_te, Y_te)
     acc[rd] = 1.0 * (Y_te == P).sum().item() / len(Y_te)
     print(str(sum(idxs_lb)) + '\t' + 'testing accuracy {}'.format(acc[rd]), flush=True)
+    results.append([sum(idxs_lb), acc[rd]])
     if sum(~strategy.idxs_lb) < opts.nQuery: break
     if opts.rounds > 0 and rd == (opts.rounds - 1): break
+
+results = np.asarray(results)
+np.savetxt(os.path.join(args['output_dir'],'strategy_performance.txt'), results)
+if visualize_embedding:
+    import cv2
+    import numpy as np
+
+    images_dir = os.path.join(args['output_dir'],'images')
+    img_array = []
+    for filename in sorted(os.listdir(images_dir)):
+        img = cv2.imread(os.path.join(images_dir, filename))
+        height, width, layers = img.shape
+        size = (width, height)
+        img_array.append(img)
+
+    out = cv2.VideoWriter(os.path.join(args['output_dir'],'demo_embedding.mp4'), cv2.VideoWriter_fourcc(*'MP4V'), 30, size)
+
+    for i in range(len(img_array)):
+        out.write(img_array[i])
+    out.release()
