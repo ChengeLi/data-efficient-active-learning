@@ -1,5 +1,75 @@
+import errno
+
 import numpy as np
 import pandas as pd
+import os
+# plot clustering results in poincare disk
+from matplotlib import pyplot as plt
+
+def dist_squared(x, y, axis=None):
+    return np.sum((x - y)**2, axis=axis)
+def plot_clusters_no_edge(emb, labels, centroids, classes, title=None, height=8, width=8,
+                  add_labels=False, label_dict=None, plot_frac=1, label_frac=0.001):
+    # Note: parameter 'emb' expects data frame with node ids and coords
+    emb.columns = ['node', 'x', 'y']
+    n_clusters = len(centroids)
+    plt.figure(figsize=(width, height))
+    plt.xlim([-1.0, 1.0])
+    plt.ylim([-1.0, 1.0])
+    ax = plt.gca()
+    circ = plt.Circle((0, 0), radius=1, edgecolor='black', facecolor='None', linewidth=3, alpha=0.5)
+    ax.add_patch(circ)
+
+    # set colormap
+    if n_clusters <= 12:
+        colors = ['b', 'r', 'g', 'y', 'm', 'c', 'k', 'silver', 'lime', 'skyblue', 'maroon', 'darkorange']
+    elif 12 < n_clusters <= 20:
+        colors = [i for i in plt.cm.get_cmap('tab20').colors]
+    else:
+        cmap = plt.cm.get_cmap(name='viridis')
+        colors = cmap(np.linspace(0, 1, n_clusters))
+
+    # plot embedding coordinates and centroids
+    emb_data = np.array(emb.iloc[:, 1:3])
+    for i in range(n_clusters):
+        plt.scatter(emb_data[(labels[i] == 1), 0], emb_data[(labels[:, i] == 1), 1],
+                    color=colors[i], alpha=0.8, edgecolors='w', linewidth=2, s=250)
+        plt.scatter(centroids[i, 0], centroids[i, 1], s=750, color=colors[i],
+                    edgecolor='black', linewidth=2, marker='*', label=classes[i])
+
+    ax.legend()
+    # add labels to embeddings
+    if add_labels and label_dict != None:
+        plt.grid('off')
+        plt.axis('off')
+        embed_vals = np.array(list(label_dict.values()))
+        keys = list(label_dict.keys())
+        # set threshhold to limit plotting labels too close together
+        min_dist_2 = label_frac * max(embed_vals.max(axis=0) - embed_vals.min(axis=0)) ** 2
+        labeled_vals = np.array([2*embed_vals.max(axis=0)])
+        n = int(plot_frac*len(embed_vals))
+        for i in np.random.permutation(len(embed_vals))[:n]:
+            if np.min(dist_squared(embed_vals[i], labeled_vals, axis=1)) < min_dist_2:
+                continue
+            else:
+                props = dict(boxstyle='round', lw=2, edgecolor='black', alpha=0.35)
+                _ = ax.text(embed_vals[i][0], embed_vals[i][1]+0.02, s=keys[i].split('.')[0],
+                            size=10, fontsize=12, verticalalignment='top', bbox=props)
+                labeled_vals = np.vstack((labeled_vals, embed_vals[i]))
+    if title != None:
+        plt.suptitle('Hyperbolic K-Means - ' + title, size=16)
+    plt.show()
+
+
+def create_directory(dir) :
+
+    try:
+        # Create inference directory
+        os.makedirs(dir)
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            raise RuntimeError(f'Unable to create one of following directories: {dir}')
+
 
 def save_df_as_npy(path, df):
     """

@@ -51,7 +51,8 @@ class PoincareBall(Manifold):
 
     def proj_tan0(self, u, c):
         return u
-
+    def norm(self, x):
+        return torch.clamp_min(x.norm(dim=-1, keepdim=True, p=2), self.min_norm)
     def expmap(self, u, p, c):
         sqrt_c = c ** 0.5
         u_norm = u.norm(dim=-1, p=2, keepdim=True).clamp_min(self.min_norm)

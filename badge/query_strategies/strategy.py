@@ -7,6 +7,7 @@ import torch.optim as optim
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from copy import deepcopy
+from tqdm import tqdm
 import pdb
 import resnet
 from torch.distributions.categorical import Categorical
@@ -84,7 +85,7 @@ class Strategy:
         if len(data) > 0:
             loader_tr = DataLoader(self.handler(data[0], torch.Tensor(data[1]).long(), transform=self.args['transform']), shuffle=True, **self.args['loader_tr_args'])
         # epoch, attempts (early stopping), training accuracy
-        print('epoch, attempts, training accuracy:, acc', flush=True)
+        if verbose: print('epoch, attempts, training accuracy:, acc', flush=True)
         epoch = 1
         accCurrent = 0.
         bestAcc = 0.
@@ -103,6 +104,7 @@ class Strategy:
                 attempts = 0
             else: attempts += 1
             epoch += 1
+
             if verbose: print(str(epoch) + '_' + str(attempts) + ' training accuracy: ' + str(accCurrent), flush=True)
             # reset if not converging
             if (epoch % 1000 == 0) and (accCurrent < 0.2) and (self.args['modelType'] != 'linear'):
@@ -334,8 +336,14 @@ class Strategy:
     def get_embedding(self, X, Y):
         loader_te = DataLoader(self.handler(X, Y, transform=self.args['transformTest']),
                             shuffle=False, **self.args['loader_te_args'])
+
         self.clf.eval()
-        embedding = torch.zeros([len(Y), self.clf.get_embedding_dim()])
+        if isinstance(self.clf, nn.DataParallel):
+            embDim = self.clf.module.get_embedding_dim()
+        else:
+            embDim = self.clf.get_embedding_dim()
+
+        embedding = torch.zeros([len(Y), embDim])
         with torch.no_grad():
             for x, y, idxs in loader_te:
                 x, y = Variable(x.cuda()), Variable(y.cuda())
