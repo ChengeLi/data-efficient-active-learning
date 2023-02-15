@@ -348,7 +348,7 @@ if visualize_embedding:
         size = (width, height)
         img_array.append(img)
 
-    out = cv2.VideoWriter(os.path.join(args['output_dir'],'demo_embedding.mp4'), cv2.VideoWriter_fourcc(*'MP4V'), 30, size)
+    out = cv2.VideoWriter(os.path.join(args['output_dir'],'demo_embedding.mp4'), cv2.VideoWriter_fourcc(*'MP4V'), 3, size)
 
     for i in range(len(img_array)):
         out.write(img_array[i])
