@@ -64,6 +64,7 @@ DATA_NAME = opts.data
 # regularization settings for bait
 opts.lamb = 1
 visualize_embedding = True
+visualize_learningcurve = True
 # non-openml data defaults
 args_pool = {'MNIST':
                  {'n_epoch': 10,
@@ -233,6 +234,7 @@ class mlpMod(nn.Module):
 
 args['output_dir'] = os.path.join('./badge/output', opts.model+ '_' + opts.alg)
 create_directory(args['output_dir'])
+EXPERIMENT_NAME = DATA_NAME + '_' + opts.model + '_' + opts.alg + '_' + str(NUM_QUERY)
 # load specified network
 if opts.model == 'mlp':
     net = mlpMod(opts.dim, embSize=opts.nEmb)
@@ -336,6 +338,7 @@ for rd in tqdm(range(1, NUM_ROUND + 1)):
 
 results = np.asarray(results)
 np.savetxt(os.path.join(args['output_dir'],'strategy_performance.txt'), results)
+
 if visualize_embedding:
     import cv2
     import numpy as np
@@ -348,8 +351,22 @@ if visualize_embedding:
         size = (width, height)
         img_array.append(img)
 
-    out = cv2.VideoWriter(os.path.join(args['output_dir'],'demo_embedding.mp4'), cv2.VideoWriter_fourcc(*'MP4V'), 3, size)
+    out = cv2.VideoWriter(os.path.join(args['output_dir'],EXPERIMENT_NAME+'_demo_emb.mp4'), cv2.VideoWriter_fourcc(*'MP4V'), 3, size)
 
     for i in range(len(img_array)):
         out.write(img_array[i])
     out.release()
+
+if visualize_learningcurve:
+    import matplotlib.pyplot as plt
+    results = np.loadtxt(os.path.join(args['output_dir'],EXPERIMENT_NAME+'_strategy_performance.txt'))
+    fig = plt.figure()
+    plt.plot(results[:,0], results[:,1], label=opts.alg)
+    plt.xlabel('Samples')
+    plt.ylabel('Accuracy')
+    plt.title(EXPERIMENT_NAME)
+    plt.ylim([0.5, 1.0])
+    plt.legend()
+    plt.show()
+    fig.savefig(os.path.join(args['output_dir'],EXPERIMENT_NAME + '_learning_curve.png'))
+
