@@ -11,8 +11,8 @@ from tqdm import tqdm
 
 import swin
 from query_strategies.util import create_directory
-from query_strategies.hyperbolic_embedding_umap_sampling import HypUmapSampleing, HypNetBadgeSampling, \
-    UmapHypKmeansSampleing
+from query_strategies.hyperbolic_embedding_umap_sampling import HypUmapSampling, HypNetBadgeSampling, \
+    UmapHypKmeansSampling, UmapHypKmeansSampling2
 from dataset import get_dataset, get_handler
 # from model import get_net
 from model import HyperNet
@@ -276,9 +276,11 @@ elif opts.alg == 'marg':  # margin-based sampling
 elif opts.alg == 'badge':  # batch active learning by diverse gradient embeddings
     strategy = BadgeSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'hypUmap':  # batch active learning by diverse gradient embeddings
-    strategy = HypUmapSampleing(X_tr, Y_tr, idxs_lb, net, handler, args)
+    strategy = HypUmapSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'UmapHypKmeans':  # batch active learning by diverse gradient embeddings
-    strategy = UmapHypKmeansSampleing(X_tr, Y_tr, idxs_lb, net, handler, args)
+    strategy = UmapHypKmeansSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
+elif opts.alg == 'UmapHypKmeans2':  # batch active learning by diverse gradient embeddings
+    strategy = UmapHypKmeansSampling2(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'hypNetBadge':
     strategy = HypNetBadgeSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'coreset':  # coreset sampling
