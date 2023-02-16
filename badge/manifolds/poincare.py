@@ -16,11 +16,12 @@ class PoincareBall(Manifold):
 
     """
 
-    def __init__(self, ):
+    def __init__(self):
         super(PoincareBall, self).__init__()
         self.name = 'PoincareBall'
         self.min_norm = 1e-15
         self.eps = {torch.float32: 4e-3, torch.float64: 1e-5}
+
 
     def sqdist(self, p1, p2, c):
         sqrt_c = c ** 0.5
