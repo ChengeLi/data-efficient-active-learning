@@ -22,6 +22,146 @@ PROJ_EPS = 1e-3
 EPS = 1e-15
 MAX_TANH_ARG = 15.0
 
+class PoincareKmeansSampling(Strategy):
+    def __init__(self, X, Y, idxs_lb, net, handler, args):
+        super(PoincareKmeansSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
+        self.manifold = PoincareBall()
+        self.curvature = 1/15 # based on plot 4 in HGCN paper
+        self.output_dir = args['output_dir']
+        self.output_sample_dir = os.path.join(self.output_dir,'samples')
+        create_directory(self.output_sample_dir)
+
+    # kmeans ++ initialization
+    def init_centers_hyp(self, X, K):
+        ind = np.argmin([self.manifold.norm(torch.tensor(s)) for s in X])
+        mu = [X[ind]]
+        indsAll = [ind]
+        centInds = [0.] * len(X)
+        cent = 0
+        # print('#Samps\tTotal Distance')
+        while len(mu) < K:
+            if len(mu) == 1:
+                D2 = self.manifold.sqdist(X, mu[-1], self.curvature).ravel().numpy().astype(float)
+            else:
+                newD = self.manifold.sqdist(X, mu[-1], self.curvature).ravel().numpy().astype(float)
+                for i in range(len(X)):
+                    if D2[i] > newD[i]:
+                        centInds[i] = cent
+                        D2[i] = newD[i]
+            # print(str(len(mu)) + '\t' + str(sum(D2)), flush=True)
+            if sum(D2) == 0.0: pdb.set_trace()
+            D2 = D2.ravel().astype(float)
+            Ddist = (D2 ** 2) / sum(D2 ** 2)
+            customDist = stats.rv_discrete(name='custm', values=(np.arange(len(D2)), Ddist))
+            ind = customDist.rvs(size=1)[0]
+            while ind in indsAll: ind = customDist.rvs(size=1)[0]
+            mu.append(X[ind])
+            indsAll.append(ind)
+            cent += 1
+        return indsAll
+    def query(self, n):
+
+        if len(os.listdir(self.output_sample_dir)) != 0:
+            name = int(sorted(os.listdir(self.output_sample_dir))[-1][:-4])+1
+            selected_sample_name = os.path.join(self.output_sample_dir,"chosen_{:05d}.csv".format(name))
+            all_emb_name = os.path.join(self.output_sample_dir, "emb_{:05d}.npy".format(name))
+            del name
+        else:
+            selected_sample_name = os.path.join(self.output_sample_dir,'chosen_00000.csv')
+            all_emb_name = os.path.join(self.output_sample_dir, 'emb_00000.npy')
+        # Get embedding for all data
+        embedding = self.get_embedding(self.X, self.Y)
+        np.save(all_emb_name, np.concatenate([np.expand_dims(self.Y, axis=1),embedding], axis=1))
+
+        print('Transform model emb to Poincare ball space and normalize in that space ...')
+        all_emb = self.manifold.expmap0(embedding.clone().detach(), self.curvature)
+        all_emb = (all_emb / max(self.manifold.norm(all_emb)))
+
+        # fit unsupervised clusters and plot results
+        print('Running Hyperbolic Kmean++ in Poincare Ball space ...')
+        idxs_unlabeled = np.arange(self.n_pool)[~self.idxs_lb]
+        chosen = self.init_centers_hyp(all_emb[idxs_unlabeled], n)
+
+        header_ = ['label', 'index']
+        df = pd.DataFrame(np.concatenate(
+            [np.expand_dims((self.Y[chosen]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1)], axis=1), columns=header_)
+        df.to_csv(selected_sample_name, index=False)
+
+        del all_emb, df
+        return idxs_unlabeled[chosen]
+
+
+
+class HyperboloidKmeansSampling(Strategy):
+    def __init__(self, X, Y, idxs_lb, net, handler, args):
+        super(HyperboloidKmeansSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
+        self.manifold = Hyperboloid()
+        self.curvature = 1/15 # based on plot 4 in HGCN paper
+        self.output_dir = args['output_dir']
+        # self.output_image_dir = os.path.join(self.output_dir,'images')
+        self.output_sample_dir = os.path.join(self.output_dir,'samples')
+        # create_directory(self.output_image_dir)
+        create_directory(self.output_sample_dir)
+
+    # kmeans ++ initialization
+    def init_centers_hyp(self, X, K):
+        ind = np.random.choice(np.arange(0,len(X))) #np.argmin([self.manifold.norm(torch.tensor(s)) for s in X])
+        mu = [X[ind]]
+        indsAll = [ind]
+        centInds = [0.] * len(X)
+        cent = 0
+        # print('#Samps\tTotal Distance')
+        while len(mu) < K:
+            if len(mu) == 1:
+                D2 = self.manifold.sqdist(X, mu[-1], self.curvature).ravel().numpy().astype(float)
+            else:
+                newD = self.manifold.sqdist(X, mu[-1], self.curvature).ravel().numpy().astype(float)
+                for i in range(len(X)):
+                    if D2[i] > newD[i]:
+                        centInds[i] = cent
+                        D2[i] = newD[i]
+            # print(str(len(mu)) + '\t' + str(sum(D2)), flush=True)
+            if sum(D2) == 0.0: pdb.set_trace()
+            D2 = D2.ravel().astype(float)
+            Ddist = (D2 ** 2) / sum(D2 ** 2)
+            customDist = stats.rv_discrete(name='custm', values=(np.arange(len(D2)), Ddist))
+            ind = customDist.rvs(size=1)[0]
+            while ind in indsAll: ind = customDist.rvs(size=1)[0]
+            mu.append(X[ind])
+            indsAll.append(ind)
+            cent += 1
+        return indsAll
+
+    def query(self, n):
+        if len(os.listdir(self.output_sample_dir)) != 0:
+            name = int(sorted(os.listdir(self.output_sample_dir))[-1][:-4])+1
+            selected_sample_name = os.path.join(self.output_sample_dir,"chosen_{:05d}.csv".format(name))
+            all_emb_name = os.path.join(self.output_sample_dir,"emb_{:05d}.npy".format(name))
+            del name
+        else:
+            selected_sample_name = os.path.join(self.output_sample_dir,'chosen_00000.csv')
+            all_emb_name = os.path.join(self.output_sample_dir,'emb_00000.npy')
+        # Get embedding for all data
+        embedding = self.get_embedding(self.X, self.Y)
+        np.save(all_emb_name, np.concatenate([np.expand_dims(self.Y, axis=1),embedding], axis=1))
+        print('Transform model emb to Poincare ball space and normalize in that space ...')
+        all_emb = self.manifold.expmap0(embedding.clone().detach(), self.curvature)
+        all_emb = (all_emb / max(self.manifold.norm(all_emb.clone().detach())))
+
+        # fit unsupervised clusters and plot results
+        print('Running Hyperbolic Kmean++ in Hyperboloid space ...')
+        idxs_unlabeled = np.arange(self.n_pool)[~self.idxs_lb]
+        chosen = self.init_centers_hyp(all_emb[idxs_unlabeled], n)
+
+        header_ = ['label', 'index']
+        df = pd.DataFrame(np.concatenate(
+            [np.expand_dims((self.Y[chosen]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1)], axis=1), columns=header_)
+        df.to_csv(selected_sample_name, index=False)
+        del all_emb, df
+        return idxs_unlabeled[chosen]
+
+
+
 class UmapPoincareKmeansSampling(Strategy):
     def __init__(self, X, Y, idxs_lb, net, handler, args):
         super(UmapPoincareKmeansSampling, self).__init__(X, Y, idxs_lb, net, handler, args)

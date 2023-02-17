@@ -12,7 +12,8 @@ from tqdm import tqdm
 import swin
 from query_strategies.util import create_directory
 from query_strategies.hyperbolic_embedding_umap_sampling import HypUmapSampling, HypNetBadgeSampling, \
-    UmapPoincareKmeansSampling, UmapHyperboloidKmeansSampling, UmapHyperboloidKmeansSampling2
+    UmapPoincareKmeansSampling, UmapHyperboloidKmeansSampling, UmapHyperboloidKmeansSampling2, \
+    HyperboloidKmeansSampling, PoincareKmeansSampling
 from dataset import get_dataset, get_handler
 # from model import get_net
 from model import HyperNet, Net0
@@ -279,13 +280,17 @@ elif opts.alg == 'marg':  # margin-based sampling
     strategy = MarginSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'badge':  # batch active learning by diverse gradient embeddings
     strategy = BadgeSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
-elif opts.alg == 'hypUmap':  # batch active learning by diverse gradient embeddings
+elif opts.alg == 'hypUmap':
     strategy = HypUmapSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
-elif opts.alg == 'UmapPoincareKmeans':  # batch active learning by diverse gradient embeddings
+elif opts.alg == 'PoincareKmeans':
+    strategy = PoincareKmeansSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
+elif opts.alg == 'HyperboloidKmeans':
+    strategy = HyperboloidKmeansSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
+elif opts.alg == 'UmapPoincareKmeans':
     strategy = UmapPoincareKmeansSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
-elif opts.alg == 'UmapHyperboloidKmeans':  # batch active learning by diverse gradient embeddings
+elif opts.alg == 'UmapHyperboloidKmeans':
     strategy = UmapHyperboloidKmeansSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
-elif opts.alg == 'UmapHyperboloidKmeans2':  # batch active learning by diverse gradient embeddings
+elif opts.alg == 'UmapHyperboloidKmeans2':
     strategy = UmapHyperboloidKmeansSampling2(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'hypNetBadge':
     strategy = HypNetBadgeSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
