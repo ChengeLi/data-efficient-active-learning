@@ -115,6 +115,7 @@ class Strategy:
             #    self.clf = self.net.apply(weight_reset)
             #    optimizer = optim.Adam(self.clf.parameters(), lr = self.args['lr'], weight_decay=0)
             #    attempts = 0
+            # self.get_embedding(self.X,self.Y)
 
 
     def train_val(self, valFrac=0.1, opt='adam', verbose=False):

@@ -232,9 +232,10 @@ class mlpMod(nn.Module):
     def get_embedding_dim(self):
         return self.embSize
 
-args['output_dir'] = os.path.join('./badge/output', opts.model+ '_' + opts.alg)
-create_directory(args['output_dir'])
+
 EXPERIMENT_NAME = DATA_NAME + '_' + opts.model + '_' + opts.alg + '_' + str(NUM_QUERY)
+args['output_dir'] = os.path.join('./badge/output', EXPERIMENT_NAME)
+create_directory(args['output_dir'])
 # load specified network
 if opts.model == 'mlp':
     net = mlpMod(opts.dim, embSize=opts.nEmb)
@@ -339,7 +340,7 @@ for rd in tqdm(range(1, NUM_ROUND + 1)):
     if opts.rounds > 0 and rd == (opts.rounds - 1): break
 
 results = np.asarray(results)
-np.savetxt(os.path.join(args['output_dir'],'strategy_performance.txt'), results)
+np.savetxt(os.path.join(args['output_dir'],EXPERIMENT_NAME+'_strategy_performance.txt'), results)
 
 if visualize_embedding:
     import cv2
