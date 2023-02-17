@@ -223,8 +223,8 @@ class UmapHyperboloidKmeansSampling(Strategy):
         print('Transform UMAP features to Poincare ball space and normalize in that space ...')
         # all_emb = self.manifold.expmap0(torch.tensor(standard_embedding), self.curvature)
         all_emb = (all_emb / max(self.manifold.norm(torch.tensor(all_emb))))
-        plt.scatter(all_emb.T[0], all_emb.T[1], c=self.Y, s=2, cmap='Spectral')
-        plt.show()
+        # plt.scatter(all_emb.T[0], all_emb.T[1], c=self.Y, s=2, cmap='Spectral')
+        # plt.show()
         header_ = ['emb_' + str(i) for i in range(np.shape(all_emb)[1])]
         header_ = ['label'] + header_
         df = pd.DataFrame(np.concatenate([np.expand_dims((self.Y).numpy(),axis=1), all_emb.numpy()],axis=1), columns=header_)
