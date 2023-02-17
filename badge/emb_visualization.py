@@ -26,7 +26,7 @@ for i in range(len(image_list)):
     # all_emb = np.asarray((pd.read_csv(os.path.join(output_sample_dir, "all_poincare_{:05d}.csv".format(i)))))
     # all_emb = np.asarray((pd.read_csv(os.path.join(output_sample_dir, "all_euclidean_{:05d}.csv".format(i)))))
     all_emb = np.asarray((pd.read_csv(os.path.join(output_sample_dir, "all_{:05d}.csv".format(i)))))
-    chosen_indexes = selected_emb[:,1]
+    chosen_indexes = np.array(selected_emb[:,1], np.dtype(int))
     plt.scatter(all_emb[:,1:].T[0],
                 all_emb[:,1:].T[1],
                 c=all_emb.T[0], cmap='Spectral')
