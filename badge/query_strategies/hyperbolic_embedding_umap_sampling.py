@@ -62,7 +62,7 @@ class PoincareKmeansSampling(Strategy):
     def query(self, n):
 
         if len(os.listdir(self.output_sample_dir)) != 0:
-            name = int(sorted(os.listdir(self.output_sample_dir))[-1][:-4])+1
+            name = int(sorted(os.listdir(self.output_sample_dir))[-1][4:-4])+1
             selected_sample_name = os.path.join(self.output_sample_dir,"chosen_{:05d}.csv".format(name))
             all_emb_name = os.path.join(self.output_sample_dir, "emb_{:05d}.npy".format(name))
             del name
@@ -134,7 +134,7 @@ class HyperboloidKmeansSampling(Strategy):
 
     def query(self, n):
         if len(os.listdir(self.output_sample_dir)) != 0:
-            name = int(sorted(os.listdir(self.output_sample_dir))[-1][:-4])+1
+            name = int(sorted(os.listdir(self.output_sample_dir))[-1][4:-4])+1
             selected_sample_name = os.path.join(self.output_sample_dir,"chosen_{:05d}.csv".format(name))
             all_emb_name = os.path.join(self.output_sample_dir,"emb_{:05d}.npy".format(name))
             del name
