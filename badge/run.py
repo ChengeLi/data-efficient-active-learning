@@ -12,7 +12,7 @@ from tqdm import tqdm
 import swin
 from query_strategies.util import create_directory
 from query_strategies.hyperbolic_embedding_umap_sampling import HypUmapSampling, HypNetBadgeSampling, \
-    UmapPoincareKmeansSampling, UmapHyperboloidKmeansSampling
+    UmapPoincareKmeansSampling, UmapHyperboloidKmeansSampling, UmapHyperboloidKmeansSampling2
 from dataset import get_dataset, get_handler
 # from model import get_net
 from model import HyperNet, Net0
@@ -285,6 +285,8 @@ elif opts.alg == 'UmapPoincareKmeans':  # batch active learning by diverse gradi
     strategy = UmapPoincareKmeansSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'UmapHyperboloidKmeans':  # batch active learning by diverse gradient embeddings
     strategy = UmapHyperboloidKmeansSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
+elif opts.alg == 'UmapHyperboloidKmeans2':  # batch active learning by diverse gradient embeddings
+    strategy = UmapHyperboloidKmeansSampling2(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'hypNetBadge':
     strategy = HypNetBadgeSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'coreset':  # coreset sampling
