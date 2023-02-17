@@ -51,9 +51,9 @@ def init_centers(X, K):
         cent += 1
     return indsAll
 
-class UmapHypKmeansSampling(Strategy):
+class UmapPoincareKmeansSampling(Strategy):
     def __init__(self, X, Y, idxs_lb, net, handler, args):
-        super(UmapHypKmeansSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
+        super(UmapPoincareKmeansSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
         self.manifold = PoincareBall()
         self.curvature = 1/15 # based on plot 4 in HGCN paper
         self.output_dir = args['output_dir']
@@ -162,9 +162,9 @@ class UmapHypKmeansSampling(Strategy):
         pass
 
 
-class UmapHypKmeansSampling2(Strategy):
+class UmapHyperboloidKmeansSampling(Strategy):
     def __init__(self, X, Y, idxs_lb, net, handler, args):
-        super(UmapHypKmeansSampling2, self).__init__(X, Y, idxs_lb, net, handler, args)
+        super(UmapHyperboloidKmeansSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
         self.manifold = Hyperboloid()
         self.curvature = 1/15 # based on plot 4 in HGCN paper
         self.output_dir = args['output_dir']
@@ -207,13 +207,16 @@ class UmapHypKmeansSampling2(Strategy):
             image_name = os.path.join(self.output_image_dir,"{:05d}.png".format(name))
             selected_sample_name = os.path.join(self.output_sample_dir,"chosen_{:05d}.csv".format(name))
             all_sample_name = os.path.join(self.output_sample_dir,"all_{:05d}.csv".format(name))
+            all_emb_name = os.path.join(self.output_sample_dir,"emb_{:05d}.npy".format(name))
             del name
         else:
             image_name = os.path.join(self.output_image_dir,'00000.png')
             selected_sample_name = os.path.join(self.output_sample_dir,'chosen_00000.csv')
             all_sample_name = os.path.join(self.output_sample_dir,'all_00000.csv')
+            all_emb_name = os.path.join(self.output_sample_dir,'emb_00000.npy')
         # Get embedding for all data
         embedding = self.get_embedding(self.X, self.Y)
+        np.save(all_emb_name, np.concatenate([np.expand_dims(self.Y, axis=1),embedding], axis=1))
         # Run UMAP to reduce dimension
         print('Training UMAP on all samples in Euclidean space and returning embeddings in hyperboloid space ...')
         all_emb = umap.UMAP(random_state=42, output_metric='hyperboloid', tqdm_kwds={'disable': False}).fit_transform(embedding)
@@ -233,11 +236,9 @@ class UmapHypKmeansSampling2(Strategy):
         chosen = self.init_centers_hyp(all_emb[idxs_unlabeled], n)
         chosen_emb = all_emb[idxs_unlabeled[chosen]]
 
-        header_ = ['emb_' + str(i) for i in range(np.shape(chosen_emb)[1])]
-        header_ = ['label', 'index'] + header_
+        header_ = ['label', 'index']
         df = pd.DataFrame(np.concatenate(
-            [np.expand_dims((self.Y[chosen]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1),
-             chosen_emb.numpy()], axis=1), columns=header_)
+            [np.expand_dims((self.Y[chosen]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1)], axis=1), columns=header_)
         df.to_csv(selected_sample_name, index=False)
         plt.scatter(all_emb.T[0],
                     all_emb.T[1],

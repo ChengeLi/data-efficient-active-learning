@@ -49,12 +49,11 @@ class HyperNet(nn.Module):
         return 2 # if use after fc2 as embedding
 
 
-
 class Net0(nn.Module):
     ### This is hyperNet without the last layer
     def __init__(self):
         super(Net0, self).__init__()
-        dim = 2
+        dim = 10
 
         self.conv1 = nn.Conv2d(1, 20, 5, 1)
         self.conv2 = nn.Conv2d(20, 50, 5, 1)
@@ -74,6 +73,7 @@ class Net0(nn.Module):
 
     def get_embedding_dim(self):
         return 500
+
 
 
 

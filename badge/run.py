@@ -12,10 +12,10 @@ from tqdm import tqdm
 import swin
 from query_strategies.util import create_directory
 from query_strategies.hyperbolic_embedding_umap_sampling import HypUmapSampling, HypNetBadgeSampling, \
-    UmapHypKmeansSampling, UmapHypKmeansSampling2
+    UmapPoincareKmeansSampling, UmapHyperboloidKmeansSampling
 from dataset import get_dataset, get_handler
 # from model import get_net
-from model import HyperNet
+from model import HyperNet, Net0
 import vgg
 import resnet
 from sklearn.preprocessing import LabelEncoder
@@ -254,6 +254,9 @@ elif opts.model == 'swin_t':
 elif opts.model == 'HyperNet':
     print('Using hypernet')
     net = HyperNet()
+elif opts.model == 'net0':
+    print('Using Net0')
+    net = Net0()
 else:
     print('choose a valid model - mlp, resnet, or vgg', flush=True)
     raise ValueError
@@ -278,10 +281,10 @@ elif opts.alg == 'badge':  # batch active learning by diverse gradient embedding
     strategy = BadgeSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'hypUmap':  # batch active learning by diverse gradient embeddings
     strategy = HypUmapSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
-elif opts.alg == 'UmapHypKmeans':  # batch active learning by diverse gradient embeddings
-    strategy = UmapHypKmeansSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
-elif opts.alg == 'UmapHypKmeans2':  # batch active learning by diverse gradient embeddings
-    strategy = UmapHypKmeansSampling2(X_tr, Y_tr, idxs_lb, net, handler, args)
+elif opts.alg == 'UmapPoincareKmeans':  # batch active learning by diverse gradient embeddings
+    strategy = UmapPoincareKmeansSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
+elif opts.alg == 'UmapHyperboloidKmeans':  # batch active learning by diverse gradient embeddings
+    strategy = UmapHyperboloidKmeansSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'hypNetBadge':
     strategy = HypNetBadgeSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'coreset':  # coreset sampling
