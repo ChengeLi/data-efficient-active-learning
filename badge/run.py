@@ -13,7 +13,7 @@ import swin
 from query_strategies.util import create_directory
 from query_strategies.hyperbolic_embedding_umap_sampling import HypUmapSampling, HypNetBadgeSampling, \
     UmapPoincareKmeansSampling, UmapHyperboloidKmeansSampling, UmapHyperboloidKmeansSampling2, \
-    HyperboloidKmeansSampling, PoincareKmeansSampling
+    HyperboloidKmeansSampling, PoincareKmeansSampling, UmapKmeansSampling
 from dataset import get_dataset, get_handler
 # from model import get_net
 from model import HyperNet, Net0
@@ -282,6 +282,8 @@ elif opts.alg == 'badge':  # batch active learning by diverse gradient embedding
     strategy = BadgeSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'hypUmap':
     strategy = HypUmapSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
+elif opts.alg == 'umap':
+    strategy = UmapKmeansSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'PoincareKmeans':
     strategy = PoincareKmeansSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'HyperboloidKmeans':
@@ -352,6 +354,20 @@ for rd in tqdm(range(1, NUM_ROUND + 1)):
 results = np.asarray(results)
 np.savetxt(os.path.join(args['output_dir'],EXPERIMENT_NAME+'_strategy_performance.txt'), results)
 
+
+if visualize_learningcurve:
+    import matplotlib.pyplot as plt
+    results = np.loadtxt(os.path.join(args['output_dir'],EXPERIMENT_NAME+'_strategy_performance.txt'))
+    fig = plt.figure()
+    plt.plot(results[:,0], results[:,1], label=opts.alg)
+    plt.xlabel('Samples')
+    plt.ylabel('Accuracy')
+    plt.title(EXPERIMENT_NAME)
+    plt.ylim([0.5, 1.0])
+    plt.legend()
+    plt.show()
+    fig.savefig(os.path.join(args['output_dir'],EXPERIMENT_NAME + '_learning_curve.png'))
+
 if visualize_embedding:
     import cv2
     import numpy as np
@@ -369,17 +385,3 @@ if visualize_embedding:
     for i in range(len(img_array)):
         out.write(img_array[i])
     out.release()
-
-if visualize_learningcurve:
-    import matplotlib.pyplot as plt
-    results = np.loadtxt(os.path.join(args['output_dir'],EXPERIMENT_NAME+'_strategy_performance.txt'))
-    fig = plt.figure()
-    plt.plot(results[:,0], results[:,1], label=opts.alg)
-    plt.xlabel('Samples')
-    plt.ylabel('Accuracy')
-    plt.title(EXPERIMENT_NAME)
-    plt.ylim([0.5, 1.0])
-    plt.legend()
-    plt.show()
-    fig.savefig(os.path.join(args['output_dir'],EXPERIMENT_NAME + '_learning_curve.png'))
-

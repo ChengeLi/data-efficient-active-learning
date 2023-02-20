@@ -87,7 +87,7 @@ class PoincareKmeansSampling(Strategy):
             [np.expand_dims((self.Y[chosen]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1)], axis=1), columns=header_)
         df.to_csv(selected_sample_name, index=False)
 
-        del all_emb, df
+        del all_emb, df, embedding
         return idxs_unlabeled[chosen]
 
 
@@ -159,6 +159,86 @@ class HyperboloidKmeansSampling(Strategy):
         df.to_csv(selected_sample_name, index=False)
         del all_emb, df
         return idxs_unlabeled[chosen]
+
+class UmapKmeansSampling(Strategy):
+    def __init__(self, X, Y, idxs_lb, net, handler, args):
+        super(UmapKmeansSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
+        self.output_dir = args['output_dir']
+        # self.output_image_dir = os.path.join(self.output_dir,'images')
+        self.output_sample_dir = os.path.join(self.output_dir,'samples')
+        # create_directory(self.output_image_dir)
+        create_directory(self.output_sample_dir)
+
+    # kmeans ++ initialization
+    def init_centers(self, X, K):
+        ind = np.argmax([np.linalg.norm(s, 2) for s in X])
+        mu = [X[ind]]
+        indsAll = [ind]
+        centInds = [0.] * len(X)
+        cent = 0
+        # print('#Samps\tTotal Distance')
+        # t1 = time()
+        while len(mu) < K:
+            if len(mu) == 1:
+                D2 = pairwise_distances(X, mu).ravel().astype(float)
+            else:
+                newD = pairwise_distances(X, [mu[-1]]).ravel().astype(float)
+                for i in range(len(X)):
+                    if D2[i] > newD[i]:
+                        centInds[i] = cent
+                        D2[i] = newD[i]
+            # print(str(len(mu)) + '\t' + str(sum(D2)), flush=True)
+            if sum(D2) == 0.0: pdb.set_trace()
+            D2 = D2.ravel().astype(float)
+            Ddist = (D2 ** 2) / sum(D2 ** 2)
+            customDist = stats.rv_discrete(name='custm', values=(np.arange(len(D2)), Ddist))
+            ind = customDist.rvs(size=1)[0]
+            while ind in indsAll: ind = customDist.rvs(size=1)[0]
+            mu.append(X[ind])
+            indsAll.append(ind)
+            cent += 1
+        # t2 = time()
+        # print(f'init centers took {t2 - t1} seconds')
+        return indsAll
+    def query(self, n):
+
+        if len(os.listdir(self.output_sample_dir)) != 0:
+            name = int(sorted(os.listdir(self.output_sample_dir))[-1][4:-4])+1
+            selected_sample_name = os.path.join(self.output_sample_dir,"chosen_{:05d}.csv".format(name))
+            all_sample_name_euclidean = os.path.join(self.output_sample_dir,"all_euclidean_{:05d}.csv".format(name))
+            all_emb_name = os.path.join(self.output_sample_dir, "emb_{:05d}.npy".format(name))
+            del name
+        else:
+            selected_sample_name = os.path.join(self.output_sample_dir,'chosen_00000.csv')
+            all_sample_name_euclidean = os.path.join(self.output_sample_dir,'all_euclidean_00000.csv')
+            all_emb_name = os.path.join(self.output_sample_dir, 'emb_00000.npy')
+        # Get embedding for all data
+        embedding = self.get_embedding(self.X, self.Y)
+        np.save(all_emb_name, np.concatenate([np.expand_dims(self.Y, axis=1),embedding], axis=1))
+
+        # Run UMAP to reduce dimension
+        print('Training UMAP on all samples in Euclidean space ...')
+        standard_embedding = umap.UMAP(n_components=10, random_state=42, tqdm_kwds={'disable': False}).fit_transform(embedding)
+
+        header_ = ['emb_' + str(i) for i in range(np.shape(standard_embedding)[1])]
+        header_ = ['label'] + header_
+        df = pd.DataFrame(np.concatenate([np.expand_dims((self.Y).numpy(),axis=1), standard_embedding],axis=1), columns=header_)
+        df.to_csv(all_sample_name_euclidean,index=False)
+
+        print('Running Kmean++ in Euclidean space ...')
+        idxs_unlabeled = np.arange(self.n_pool)[~self.idxs_lb]
+        chosen = self.init_centers(standard_embedding[idxs_unlabeled], n)
+
+        header_ = ['label', 'index']
+        df = pd.DataFrame(np.concatenate(
+            [np.expand_dims((self.Y[chosen]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1)], axis=1), columns=header_)
+        df.to_csv(selected_sample_name, index=False)
+
+        del standard_embedding, df
+        return idxs_unlabeled[chosen]
+
+
+        pass
 
 
 
@@ -576,7 +656,7 @@ class HypUmapSampling(Strategy):
         # plot_clusters_no_edge(emb, self.Y, chosen_emb[:,0:2], self.classes)
         plt.savefig(image_name)
         plt.close('all')
-        del chosen_emb, all_emb, df
+        del embedding, chosen_emb, all_emb, df
         return idxs_unlabeled[chosen]
 
 
