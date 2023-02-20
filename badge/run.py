@@ -355,7 +355,7 @@ for rd in tqdm(range(1, NUM_ROUND + 1)):
 
     # update
     strategy.update(idxs_lb)
-    strategy.train(verbose=True, model_selection=opts.model)
+    strategy.train(verbose=False, model_selection=opts.model)
 
     # round accuracy
     P = strategy.predict(X_te, Y_te)
@@ -367,20 +367,6 @@ for rd in tqdm(range(1, NUM_ROUND + 1)):
 
 results = np.asarray(results)
 np.savetxt(os.path.join(args['output_dir'],EXPERIMENT_NAME+'_strategy_performance.txt'), results)
-
-
-if visualize_learningcurve:
-    import matplotlib.pyplot as plt
-    results = np.loadtxt(os.path.join(args['output_dir'],EXPERIMENT_NAME+'_strategy_performance.txt'))
-    fig = plt.figure()
-    plt.plot(results[:,0], results[:,1], label=opts.alg)
-    plt.xlabel('Samples')
-    plt.ylabel('Accuracy')
-    plt.title(EXPERIMENT_NAME)
-    plt.ylim([0.5, 1.0])
-    plt.legend()
-    plt.show()
-    fig.savefig(os.path.join(args['output_dir'],EXPERIMENT_NAME + '_learning_curve.png'))
 
 if visualize_embedding:
     import cv2
@@ -417,5 +403,5 @@ if visualize_learningcurve:
     plt.ylim([0.5, 1.0])
     plt.legend()
     plt.grid('on')
-    plt.show()
     fig.savefig(os.path.join(args['output_dir'],EXPERIMENT_NAME + '_learning_curve.png'))
+
