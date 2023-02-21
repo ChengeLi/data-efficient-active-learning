@@ -64,7 +64,7 @@ def init_centers(X, K):
     # print('#Samps\tTotal Distance')
     # t1 = time()
     # print('#Samps\tTotal Distance')
-    t1 = time()
+    # t1 = time()
     while len(mu) < K:
         if len(mu) == 1:
             D2 = pairwise_distances(X, mu).ravel().astype(float)
