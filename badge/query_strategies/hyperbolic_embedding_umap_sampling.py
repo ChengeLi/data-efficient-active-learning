@@ -157,7 +157,7 @@ class HyperboloidKmeansSampling(Strategy):
         df = pd.DataFrame(np.concatenate(
             [np.expand_dims((self.Y[chosen]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1)], axis=1), columns=header_)
         df.to_csv(selected_sample_name, index=False)
-        del all_emb, df
+        del embedding, all_emb, df
         return idxs_unlabeled[chosen]
 
 class UmapKmeansSampling(Strategy):
@@ -350,7 +350,7 @@ class UmapPoincareKmeansSampling(Strategy):
         # plot_clusters_no_edge(emb, self.Y, chosen_emb[:,0:2], self.classes)
         plt.savefig(image_name)
         plt.close('all')
-        del chosen_emb, all_emb, df
+        del embedding, chosen_emb, all_emb, df
         return idxs_unlabeled[chosen]
 
 
@@ -452,7 +452,7 @@ class UmapHyperboloidKmeansSampling(Strategy):
         # plot_clusters_no_edge(emb, self.Y, chosen_emb[:,0:2], self.classes)
         plt.savefig(image_name)
         plt.close('all')
-        del chosen_emb, all_emb, df
+        del embedding, chosen_emb, all_emb, df
         return idxs_unlabeled[chosen]
         pass
 
@@ -551,7 +551,7 @@ class UmapHyperboloidKmeansSampling2(Strategy):
         # plot_clusters_no_edge(emb, self.Y, chosen_emb[:,0:2], self.classes)
         plt.savefig(image_name)
         plt.close('all')
-        del chosen_emb, all_emb, df
+        del embedding, chosen_emb, all_emb, df
         return idxs_unlabeled[chosen]
         pass
 
