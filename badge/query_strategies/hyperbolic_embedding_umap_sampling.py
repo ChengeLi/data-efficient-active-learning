@@ -308,6 +308,7 @@ class UmapKmeansSampling(Strategy):
         df.to_csv(selected_sample_name, index=False)
 
         del standard_embedding, df
+        del embedding, all_emb, df
         return idxs_unlabeled[chosen]
 
 class UmapKmeansSampling(Strategy):
@@ -501,7 +502,7 @@ class UmapPoincareKmeansSampling(Strategy):
         # plot_clusters_no_edge(emb, self.Y, chosen_emb[:,0:2], self.classes)
         plt.savefig(image_name)
         plt.close('all')
-        del embedding, chosen_emb, all_emb, df
+        del chosen_emb, all_emb, df
         return idxs_unlabeled[chosen]
 
 
@@ -605,6 +606,29 @@ class UmapHyperboloidKmeansSampling(Strategy):
         plt.close('all')
         del embedding, chosen_emb, all_emb, df
         return idxs_unlabeled[chosen]
+        header_ = ['label', 'index']
+        df = pd.DataFrame(np.concatenate(
+            [np.expand_dims((self.Y[chosen]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1)], axis=1), columns=header_)
+        df.to_csv(selected_sample_name, index=False)
+        plt.scatter(all_emb.T[0],
+                    all_emb.T[1],
+                    c=self.Y, s=2, cmap='Spectral')
+        plt.scatter(chosen_emb.T[0],
+                    chosen_emb.T[1],
+                    c=self.Y[idxs_unlabeled[chosen]],
+                    edgecolor='black', linewidth=0.3, marker='*', cmap='Spectral')
+        plt.xlim([-1, 1])
+        plt.ylim([-1, 1])
+        # emb = np.concatenate(
+        #     [np.expand_dims(np.arange(0, len(all_emb)), axis=1), all_emb],
+        #     axis=1)[:, 0:3]
+        # emb = pd.DataFrame(emb, columns=['node', 'x', 'y'])
+        # plot_clusters_no_edge(emb, self.Y, chosen_emb[:,0:2], self.classes)
+        plt.savefig(image_name)
+        plt.close('all')
+        del embedding, chosen_emb, all_emb, df
+        return idxs_unlabeled[chosen]
+        pass
 
 
 
@@ -850,6 +874,7 @@ class BaitHypSampling(Strategy):
         pass
 
 
+
 class HypNetBadgeSampling(Strategy):
     """
         use hyperbolic layer as last layer,
@@ -891,12 +916,12 @@ class HypNetBadgeSampling(Strategy):
         """
             option 1: use regular gradient in badge
             option 2: fix grad using riemannian gradient in badge
-            
+
         """
         use_Riemannian_grad_badge = True
 
         idxs_unlabeled = np.arange(self.n_pool)[~self.idxs_lb]
-        gradEmbedding = self.get_grad_embedding_for_hyperNet(self.X[idxs_unlabeled], self.Y.numpy()[idxs_unlabeled], 
+        gradEmbedding = self.get_grad_embedding_for_hyperNet(self.X[idxs_unlabeled], self.Y.numpy()[idxs_unlabeled],
                                                              fix_grad=use_Riemannian_grad_badge).numpy()
         chosen = self.init_centers(gradEmbedding, n)
         return idxs_unlabeled[chosen]
