@@ -1,5 +1,9 @@
 # import numpy as np
 # from torch.utils.data import DataLoader
+import os
+
+import pandas as pd
+
 from .strategy import Strategy
 # import pickle
 # from scipy.spatial.distance import cosine
@@ -42,6 +46,9 @@ import numpy as np
 # from sklearn.exceptions import ConvergenceWarning
 
 from sklearnex import patch_sklearn
+
+from .util import create_directory
+
 patch_sklearn()
 from sklearn.metrics import pairwise_distances
 import pdb
@@ -54,8 +61,8 @@ def init_centers(X, K):
     indsAll = [ind]
     centInds = [0.] * len(X)
     cent = 0
-    print('#Samps\tTotal Distance')
-    t1 = time()
+    # print('#Samps\tTotal Distance')
+    # t1 = time()
     while len(mu) < K:
         if len(mu) == 1:
             D2 = pairwise_distances(X, mu).ravel().astype(float)
@@ -65,7 +72,7 @@ def init_centers(X, K):
                 if D2[i] >  newD[i]:
                     centInds[i] = cent
                     D2[i] = newD[i]
-        print(str(len(mu)) + '\t' + str(sum(D2)), flush=True)
+        # print(str(len(mu)) + '\t' + str(sum(D2)), flush=True)
         if sum(D2) == 0.0: pdb.set_trace()
         D2 = D2.ravel().astype(float)
         Ddist = (D2 ** 2)/ sum(D2 ** 2)
@@ -75,16 +82,38 @@ def init_centers(X, K):
         mu.append(X[ind])
         indsAll.append(ind)
         cent += 1
-    t2 = time()
-    print(f'init centers took {t2-t1} seconds')
+    # t2 = time()
+    # print(f'init centers took {t2-t1} seconds')
     return indsAll
 
 class BadgeSampling(Strategy):
     def __init__(self, X, Y, idxs_lb, net, handler, args):
         super(BadgeSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
+        self.output_dir = args['output_dir']
+        self.output_sample_dir = os.path.join(self.output_dir,'samples')
+        create_directory(self.output_sample_dir)
 
     def query(self, n):
+        if len(os.listdir(self.output_sample_dir)) != 0:
+            name = int(sorted(os.listdir(self.output_sample_dir))[-1][4:-4])+1
+            selected_sample_name = os.path.join(self.output_sample_dir,"chosen_{:05d}.csv".format(name))
+            all_emb_name = os.path.join(self.output_sample_dir, "emb_{:05d}.npy".format(name))
+            del name
+        else:
+            selected_sample_name = os.path.join(self.output_sample_dir,'chosen_00000.csv')
+            all_emb_name = os.path.join(self.output_sample_dir, "emb_00000.npy")
         idxs_unlabeled = np.arange(self.n_pool)[~self.idxs_lb]
+        embedding = self.get_embedding(self.X, self.Y)
+        np.save(all_emb_name, np.concatenate([np.expand_dims(self.Y, axis=1), embedding], axis=1))
+        print('Computing gradEmbedding ...')
         gradEmbedding = self.get_grad_embedding(self.X[idxs_unlabeled], self.Y.numpy()[idxs_unlabeled]).numpy()
+
+        print('Running Kmean++ ...')
         chosen = init_centers(gradEmbedding, n)
+
+        header_ = ['label', 'index']
+        df = pd.DataFrame(np.concatenate(
+            [np.expand_dims((self.Y[chosen]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1)], axis=1), columns=header_)
+        df.to_csv(selected_sample_name, index=False)
+        del embedding, gradEmbedding
         return idxs_unlabeled[chosen]
