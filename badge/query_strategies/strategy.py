@@ -104,7 +104,6 @@ class Strategy:
                 attempts = 0
             else: attempts += 1
             epoch += 1
-
             if verbose: print(str(epoch) + '_' + str(attempts) + ' training accuracy: ' + str(accCurrent), flush=True)
             # reset if not converging
             if (epoch % 1000 == 0) and (accCurrent < 0.2) and (self.args['modelType'] != 'linear'):
@@ -412,7 +411,6 @@ class Strategy:
         return torch.Tensor(embedding)
 
 
-
     def get_grad_embedding_for_hyperNet(self, X, Y, model=[], fix_grad=False):
 
         def get_riemannian_gradient(x):
@@ -522,11 +520,80 @@ class Strategy:
 
 
 
+    def get_grad_embedding_for_hyperNet(self, X, Y, model=[]):
+        if type(model) == list:
+            model = self.clf
+
+        if isinstance(model, nn.DataParallel):
+            embDim = model.module.get_embedding_dim()
+        else:
+            embDim = model.get_embedding_dim()
+        model.eval()
+        nLab = len(np.unique(Y))
+        embedding = np.zeros([len(Y), embDim * nLab])
+        loader_te = DataLoader(self.handler(X, Y, transform=self.args['transformTest']),
+                            shuffle=False, **self.args['loader_te_args'])
+        with torch.no_grad():
+            for x, y, idxs in loader_te:
+                x, y = Variable(x.cuda()), Variable(y.cuda())
+                cout, out = model(x) #mlr is after hyperbolic softmax
+                out = out.data.cpu().numpy()
+                batchProbs = F.softmax(cout, dim=1).data.cpu().numpy()
+                maxInds = np.argmax(batchProbs,1)
+                for j in range(len(y)):
+                    for c in range(nLab):
+                        if c == maxInds[j]:
+                            embedding[idxs[j]][embDim * c : embDim * (c+1)] = deepcopy(out[j]) * (1 - batchProbs[j][c])
+                        else:
+                            embedding[idxs[j]][embDim * c : embDim * (c+1)] = deepcopy(out[j]) * (-1 * batchProbs[j][c])
+            return torch.Tensor(embedding)
+
+
+    def hyp_transformation(emb):
+        import hyptorch.nn as hypnn
+        ## hyperparameters
+        dim = 2 #"Dimension of the Poincare ball"
+        c = 1.0 #"Curvature of the Poincare ball"
+        train_x = False # train the exponential map origin
+        train_c = False # train the Poincare ball curvature
+
+        tp = hypnn.ToPoincare(
+                c=c, train_x=train_x, train_c=train_c, ball_dim=dim
+            )
+        hyper_emb = tp(emb)
+        return hyper_emb
 
 
 
+    # gradient embedding for badge (assumes cross-entropy loss)
+    def get_grad_embedding_hyperbolic_feature(self, X, Y, model=[]):
+        """
+        the only difference with BADGE is we transform the feature in euclidean space to poincre ball first
+        """
+        if type(model) == list:
+            model = self.clf
+        
+        embDim = model.get_embedding_dim()
+        model.eval()
+        nLab = len(np.unique(Y))
+        embedding = np.zeros([len(Y), embDim * nLab])
+        loader_te = DataLoader(self.handler(X, Y, transform=self.args['transformTest']),
+                            shuffle=False, **self.args['loader_te_args'])
+        with torch.no_grad():
+            for x, y, idxs in loader_te:
+                x, y = Variable(x.cuda()), Variable(y.cuda())
+                cout, out = model(x)
 
+                ### here's the hyperbolic transformation
+                out = hyp_transformation(out)
 
-
-
-
+                out = out.data.cpu().numpy()
+                batchProbs = F.softmax(cout, dim=1).data.cpu().numpy()
+                maxInds = np.argmax(batchProbs,1)
+                for j in range(len(y)):
+                    for c in range(nLab):
+                        if c == maxInds[j]:
+                            embedding[idxs[j]][embDim * c : embDim * (c+1)] = deepcopy(out[j]) * (1 - batchProbs[j][c])
+                        else:
+                            embedding[idxs[j]][embDim * c : embDim * (c+1)] = deepcopy(out[j]) * (-1 * batchProbs[j][c])
+            return torch.Tensor(embedding)

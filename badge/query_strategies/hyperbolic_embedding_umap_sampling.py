@@ -311,9 +311,6 @@ class UmapKmeansSampling(Strategy):
         return idxs_unlabeled[chosen]
 
 
-        pass
-
-
 
 class UmapPoincareKmeansSampling(Strategy):
     def __init__(self, X, Y, idxs_lb, net, handler, args):
@@ -528,7 +525,7 @@ class UmapHyperboloidKmeansSampling(Strategy):
         plt.close('all')
         del embedding, chosen_emb, all_emb, df
         return idxs_unlabeled[chosen]
-        pass
+
 
 
 class UmapHyperboloidKmeansSampling2(Strategy):
