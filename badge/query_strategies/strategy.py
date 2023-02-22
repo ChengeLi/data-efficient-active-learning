@@ -520,7 +520,13 @@ class Strategy:
 
 
 
-    def get_grad_embedding_for_hyperNet(self, X, Y, model=[]):
+    def get_grad_embedding_for_hyperNet(self, X, Y, model=[], fix_grad=False):
+
+        def get_riemannian_gradient(x):
+            RiemannianGradient_c = 1
+            scale = (1 - (RiemannianGradient_c * x**2).sum(-1))**2 / 4
+            return scale*x
+
         if type(model) == list:
             model = self.clf
 
@@ -546,34 +552,30 @@ class Strategy:
                             embedding[idxs[j]][embDim * c : embDim * (c+1)] = deepcopy(out[j]) * (1 - batchProbs[j][c])
                         else:
                             embedding[idxs[j]][embDim * c : embDim * (c+1)] = deepcopy(out[j]) * (-1 * batchProbs[j][c])
+                if fix_grad:
+                    print('fix gradient to be RiemannianGradient')
+                    for ii in range(len(embedding)):
+                        for jj in range(embedding.shape[1]):
+                            embedding[ii,jj] = get_riemannian_gradient(embedding[ii,jj])
+
             return torch.Tensor(embedding)
 
 
-    def hyp_transformation(emb):
-        import hyptorch.nn as hypnn
-        ## hyperparameters
-        dim = 2 #"Dimension of the Poincare ball"
-        c = 1.0 #"Curvature of the Poincare ball"
-        train_x = False # train the exponential map origin
-        train_c = False # train the Poincare ball curvature
-
-        tp = hypnn.ToPoincare(
-                c=c, train_x=train_x, train_c=train_c, ball_dim=dim
-            )
-        hyper_emb = tp(emb)
-        return hyper_emb
-
-
-
-    # gradient embedding for badge (assumes cross-entropy loss)
     def get_grad_embedding_hyperbolic_feature(self, X, Y, model=[]):
         """
         the only difference with BADGE is we transform the feature in euclidean space to poincre ball first
+        haven't run this one yet
         """
+        from manifolds import PoincareBall
+        self.manifold = PoincareBall()
         if type(model) == list:
             model = self.clf
         
-        embDim = model.get_embedding_dim()
+        if isinstance(model, nn.DataParallel):
+            embDim = model.module.get_embedding_dim()
+        else:
+            embDim = model.get_embedding_dim()
+
         model.eval()
         nLab = len(np.unique(Y))
         embedding = np.zeros([len(Y), embDim * nLab])
@@ -585,9 +587,11 @@ class Strategy:
                 cout, out = model(x)
 
                 ### here's the hyperbolic transformation
-                out = hyp_transformation(out)
-
                 out = out.data.cpu().numpy()
+                print('Transform model emb to Poincare ball space and normalize in that space ...')
+                all_emb = self.manifold.expmap0(out.clone().detach(), self.curvature)
+                out = (all_emb / max(self.manifold.norm(all_emb)))
+
                 batchProbs = F.softmax(cout, dim=1).data.cpu().numpy()
                 maxInds = np.argmax(batchProbs,1)
                 for j in range(len(y)):
@@ -597,3 +601,39 @@ class Strategy:
                         else:
                             embedding[idxs[j]][embDim * c : embDim * (c+1)] = deepcopy(out[j]) * (-1 * batchProbs[j][c])
             return torch.Tensor(embedding)
+
+
+
+    def get_hyperbolic_embedding_norm(self, X, Y, model=[]):
+
+        if type(model) == list:
+            model = self.clf
+        
+        if isinstance(model, nn.DataParallel):
+            embDim = model.module.get_embedding_dim()
+        else:
+            embDim = model.get_embedding_dim()
+        model.eval()
+        embedding = np.zeros([len(Y), embDim])
+        loader_te = DataLoader(self.handler(X, Y, transform=self.args['transformTest']),
+                            shuffle=False, **self.args['loader_te_args'])
+        with torch.no_grad():
+            for x, y, idxs in loader_te:
+                x, y = Variable(x.cuda()), Variable(y.cuda())
+                cout, out = model(x)
+                out = out.data.cpu().numpy()
+                for j in range(len(y)):
+                    embedding[idxs[j]] = deepcopy(out[j])
+            return torch.Tensor(embedding)
+
+
+
+
+
+
+
+
+
+
+
+

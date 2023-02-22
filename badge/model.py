@@ -81,7 +81,6 @@ class Net00(nn.Module):
         super(Net00, self).__init__()
         classes = 10
         self.embedding_dim = 20
-
         self.conv1 = nn.Conv2d(1, 20, 5, 1)
         self.conv2 = nn.Conv2d(20, 50, 5, 1)
         self.fc1 = nn.Linear(4 * 4 * 50, 500)

@@ -372,7 +372,6 @@ np.savetxt(os.path.join(args['output_dir'],EXPERIMENT_NAME+'_strategy_performanc
 
 if visualize_embedding:
     import cv2
-    import numpy as np
 
     images_dir = os.path.join(args['output_dir'],'images')
     if not os.path.exists(args['output_dir']):

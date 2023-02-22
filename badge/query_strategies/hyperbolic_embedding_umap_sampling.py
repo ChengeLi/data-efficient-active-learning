@@ -359,7 +359,7 @@ class UmapPoincareKmeansSampling(Strategy):
             cent += 1
         return indsAll
 
-    def query(self, n):
+   def query(self, n):
 
         if len(os.listdir(self.output_image_dir)) != 0:
             name = int(sorted(os.listdir(self.output_image_dir))[-1][:-4]) + 1
@@ -847,17 +847,16 @@ class HypNetBadgeSampling(Strategy):
             cent += 1
         return indsAll
 
-    def query(self, n):
+   def query(self, n):
         """
             option 1: use regular gradient in badge
             option 2: fix grad using riemannian gradient in badge
-
-        """
+       """
         use_Riemannian_grad_badge = True
 
         idxs_unlabeled = np.arange(self.n_pool)[~self.idxs_lb]
         gradEmbedding = self.get_grad_embedding_for_hyperNet(self.X[idxs_unlabeled], self.Y.numpy()[idxs_unlabeled],
-                                                             fix_grad=use_Riemannian_grad_badge).numpy()
+                                                            fix_grad=use_Riemannian_grad_badge).numpy()
         chosen = self.init_centers(gradEmbedding, n)
         return idxs_unlabeled[chosen]
 
