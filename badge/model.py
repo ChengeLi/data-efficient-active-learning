@@ -79,13 +79,14 @@ class Net00(nn.Module):
     ### This is hyperNet without the last layer
     def __init__(self):
         super(Net00, self).__init__()
-        dim = 10
+        classes = 10
+        self.embedding_dim = 20
 
         self.conv1 = nn.Conv2d(1, 20, 5, 1)
         self.conv2 = nn.Conv2d(20, 50, 5, 1)
         self.fc1 = nn.Linear(4 * 4 * 50, 500)
-        self.fc2 = nn.Linear(500, 2) ### mimic poincare ball
-        self.fc3 = nn.Linear(2, dim)
+        self.fc2 = nn.Linear(500, self.embedding_dim) ### mimic poincare ball
+        self.fc3 = nn.Linear(self.embedding_dim, classes)
 
     def forward(self, x):
         x = F.relu(self.conv1(x))
@@ -101,7 +102,7 @@ class Net00(nn.Module):
         return x, e2
 
     def get_embedding_dim(self):
-        return 2
+        return self.embedding_dim
 
 
 class Net1(nn.Module):

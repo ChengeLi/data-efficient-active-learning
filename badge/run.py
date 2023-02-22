@@ -241,7 +241,7 @@ class mlpMod(nn.Module):
         return self.embSize
 
 
-EXPERIMENT_NAME = DATA_NAME + '_' + opts.model + '_' + opts.alg + '_' + str(NUM_QUERY)
+EXPERIMENT_NAME = DATA_NAME + '_' + opts.model +'_embDim20' + '_' + opts.alg + '_' + str(NUM_QUERY)
 args['output_dir'] = os.path.join('./badge/output', EXPERIMENT_NAME)
 create_directory(args['output_dir'])
 # load specified network
@@ -332,7 +332,7 @@ print(type(strategy).__name__, flush=True)
 if type(X_te) == torch.Tensor: X_te = X_te.numpy()
 results = []
 # round 0 accuracy
-strategy.train(verbose=False,model_selection=opts.model)
+strategy.train(verbose=True,model_selection=opts.model)
 P = strategy.predict(X_te, Y_te)
 acc = np.zeros(NUM_ROUND + 1)
 acc[0] = 1.0 * (Y_te == P).sum().item() / len(Y_te)
