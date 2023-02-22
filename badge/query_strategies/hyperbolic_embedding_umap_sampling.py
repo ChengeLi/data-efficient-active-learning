@@ -819,6 +819,21 @@ class HypNetBadgeSampling(Strategy):
     def __init__(self, X, Y, idxs_lb, net, handler, args):
         super(HypNetBadgeSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
 
+    def query(self, n):
+        idxs_unlabeled = np.arange(self.n_pool)[~self.idxs_lb]
+        gradEmbedding = self.get_grad_embedding_for_hyperNet(self.X[idxs_unlabeled], self.Y.numpy()[idxs_unlabeled]).numpy()
+        chosen = init_centers(gradEmbedding, n)
+        return idxs_unlabeled[chosen]
+
+
+class HypNetBadgeSampling(Strategy):
+    """
+        use hyperbolic layer as last layer,
+        use normal cross entropy as BADGE
+    """
+    def __init__(self, X, Y, idxs_lb, net, handler, args):
+        super(HypNetBadgeSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
+
     def init_centers(self, X, K):
         ind = np.argmax([np.linalg.norm(s, 2) for s in X])  # this only make sense for badge
         mu = [X[ind]]
