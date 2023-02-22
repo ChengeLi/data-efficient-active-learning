@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.init as init
 
 import hyptorch.pmath as pmath
-
+import pdb
 
 class HyperbolicMLR(nn.Module):
     r"""
@@ -28,6 +28,55 @@ class HyperbolicMLR(nn.Module):
         else:
             c = torch.as_tensor(c).type_as(x)
         p_vals_poincare = pmath.expmap0(self.p_vals, c=c)
+        conformal_factor = 1 - c * p_vals_poincare.pow(2).sum(dim=1, keepdim=True)
+        a_vals_poincare = self.a_vals * conformal_factor
+        logits = pmath._hyperbolic_softmax(x, a_vals_poincare, p_vals_poincare, c)
+        return logits
+
+    def extra_repr(self):
+        return "Poincare ball dim={}, n_classes={}, c={}".format(
+            self.ball_dim, self.n_classes, self.c
+        )
+
+    def reset_parameters(self):
+        init.kaiming_uniform_(self.a_vals, a=math.sqrt(5))
+        init.kaiming_uniform_(self.p_vals, a=math.sqrt(5))
+
+
+class HyperbolicMLR_fix_grad(nn.Module):
+    r"""
+    Module which performs softmax classification
+    in Hyperbolic space.
+    """
+
+    def __init__(self, ball_dim, n_classes, c, riemannian=True):
+        super(HyperbolicMLR_fix_grad, self).__init__()
+        self.a_vals = nn.Parameter(torch.Tensor(n_classes, ball_dim))
+        self.p_vals = nn.Parameter(torch.Tensor(n_classes, ball_dim))
+        self.c = c
+        self.n_classes = n_classes
+        self.ball_dim = ball_dim
+        self.reset_parameters()
+
+        ### add grad fix
+        self.riemannian = pmath.RiemannianGradient
+        self.riemannian.c = c
+
+        if riemannian:
+            self.grad_fix = lambda x: self.riemannian.apply(x)
+        else:
+            self.grad_fix = lambda x: x
+
+
+    def forward(self, x, c=None):
+        if c is None:
+            c = torch.as_tensor(self.c).type_as(x)
+        else:
+            c = torch.as_tensor(c).type_as(x)
+        p_vals_poincare = pmath.expmap0(self.p_vals, c=c)
+        # insert the grad fix
+        p_vals_poincare = self.grad_fix(pmath.project(p_vals_poincare, c=c))
+
         conformal_factor = 1 - c * p_vals_poincare.pow(2).sum(dim=1, keepdim=True)
         a_vals_poincare = self.a_vals * conformal_factor
         logits = pmath._hyperbolic_softmax(x, a_vals_poincare, p_vals_poincare, c)
