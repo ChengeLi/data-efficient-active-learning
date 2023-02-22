@@ -59,6 +59,7 @@ class PoincareKmeansSampling(Strategy):
             indsAll.append(ind)
             cent += 1
         return indsAll
+    
     def query(self, n):
 
         if len(os.listdir(self.output_sample_dir)) != 0:
@@ -201,6 +202,7 @@ class UmapPoincareKmeansSampling(Strategy):
             indsAll.append(ind)
             cent += 1
         return indsAll
+    
     def query(self, n):
 
         if len(os.listdir(self.output_image_dir)) != 0:
@@ -627,7 +629,7 @@ class HypNetBadgeSampling(Strategy):
     def __init__(self, X, Y, idxs_lb, net, handler, args):
         super(HypNetBadgeSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
 
-    def init_centers(self,X, K):
+    def init_centers(self, X, K):
         ind = np.argmax([np.linalg.norm(s, 2) for s in X])  # this only make sense for badge
         mu = [X[ind]]
         indsAll = [ind]
@@ -654,16 +656,41 @@ class HypNetBadgeSampling(Strategy):
             indsAll.append(ind)
             cent += 1
         return indsAll
+
+
     def query(self, n):
-        # compute hyp-emb for all unlabeled
-        # get_grad
-        # Run Kmeans to get clusters and sample association
-        # chosen = init_centers(gradEmbedding, n)
+        """
+            option 1: use regular gradient in badge
+            option 2: fix grad using riemannian gradient in badge
+            
+        """
+        use_Riemannian_grad_badge = True
 
         idxs_unlabeled = np.arange(self.n_pool)[~self.idxs_lb]
-        gradEmbedding = self.get_grad_embedding_for_hyperNet(self.X[idxs_unlabeled], self.Y.numpy()[idxs_unlabeled]).numpy()
+        gradEmbedding = self.get_grad_embedding_for_hyperNet(self.X[idxs_unlabeled], self.Y.numpy()[idxs_unlabeled], 
+                                                             fix_grad=use_Riemannian_grad_badge).numpy()
         chosen = self.init_centers(gradEmbedding, n)
         return idxs_unlabeled[chosen]
 
+
+
+class HypNetNormSampling(Strategy):
+    """
+        use hyperbolic embedding's norm as a measure of uncertainty
+    """
+    def __init__(self, X, Y, idxs_lb, net, handler, args):
+        super(HypNetNormSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
+
+    def init_centers(self, X, K):
+        hyper_emb_norm = [np.linalg.norm(s, 2) for s in X]
+        indsAll = np.argsort(hyper_emb_norm, axis=0)[:K] #select the smallest K samples
+        return indsAll
+
+
+    def query(self, n):
+        idxs_unlabeled = np.arange(self.n_pool)[~self.idxs_lb]
+        gradEmbedding = self.get_hyperbolic_embedding_norm(self.X[idxs_unlabeled], self.Y.numpy()[idxs_unlabeled]).numpy()
+        chosen = self.init_centers(gradEmbedding, n)
+        return idxs_unlabeled[chosen]
 
 

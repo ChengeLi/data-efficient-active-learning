@@ -17,7 +17,7 @@ class HyperNet(nn.Module):
     # https://github.com/leymir/hyperbolic-image-embeddings/blob/master/examples/mnist.py
     def __init__(self):
         ## hyperparameters
-        dim = 2 #"Dimension of the Poincare ball"
+        self.poincare_ball_dim = 20 #"Dimension of the Poincare ball"
         c = 1.0 #"Curvature of the Poincare ball"
         train_x = False # train the exponential map origin
         train_c = False # train the Poincare ball curvature
@@ -26,11 +26,12 @@ class HyperNet(nn.Module):
         self.conv1 = nn.Conv2d(1, 20, 5, 1)
         self.conv2 = nn.Conv2d(20, 50, 5, 1)
         self.fc1 = nn.Linear(4 * 4 * 50, 500)
-        self.fc2 = nn.Linear(500, dim)
+        self.fc2 = nn.Linear(500, self.poincare_ball_dim)
         self.tp = hypnn.ToPoincare(
-            c=c, train_x=train_x, train_c=train_c, ball_dim=dim
+            c=c, train_x=train_x, train_c=train_c, ball_dim=self.poincare_ball_dim
         )
-        self.mlr = hypnn.HyperbolicMLR(ball_dim=dim, n_classes=10, c=c)
+        self.mlr = hypnn.HyperbolicMLR(ball_dim=self.poincare_ball_dim, n_classes=10, c=c)
+        # self.mlr = hypnn.HyperbolicMLR_fix_grad(ball_dim=dim, n_classes=10, c=c)
 
     def forward(self, x):
         x = F.relu(self.conv1(x))
@@ -46,7 +47,7 @@ class HyperNet(nn.Module):
 
     def get_embedding_dim(self):
         # return 500 #if use after fc1 as embedding
-        return 2 # if use after fc2 as embedding
+        return self.poincare_ball_dim # if use after fc2 as embedding
 
 
 class Net0(nn.Module):
@@ -73,6 +74,37 @@ class Net0(nn.Module):
 
     def get_embedding_dim(self):
         return 500
+
+
+class Net00(nn.Module):
+    ### This is hyperNet without the last layer
+    def __init__(self):
+        super(Net00, self).__init__()
+        dim = 10
+
+        self.conv1 = nn.Conv2d(1, 20, 5, 1)
+        self.conv2 = nn.Conv2d(20, 50, 5, 1)
+        self.fc1 = nn.Linear(4 * 4 * 50, 500)
+        self.fc2 = nn.Linear(500, 2) ### mimic poincare ball
+        self.fc3 = nn.Linear(2, dim)
+
+    def forward(self, x):
+        x = F.relu(self.conv1(x))
+        x = F.max_pool2d(x, 2, 2)
+        x = F.relu(self.conv2(x))
+        x = F.max_pool2d(x, 2, 2)
+        x = x.view(-1, 4 * 4 * 50)
+        e1 = F.relu(self.fc1(x))
+        x = F.dropout(e1, training=self.training)
+        e2 = F.relu(self.fc2(x))
+        x = F.dropout(e2, training=self.training)
+        x = self.fc3(x)
+        return x, e2
+
+    def get_embedding_dim(self):
+        return 2
+
+
 
 
 

@@ -13,10 +13,10 @@ import swin
 from query_strategies.util import create_directory
 from query_strategies.hyperbolic_embedding_umap_sampling import HypUmapSampling, HypNetBadgeSampling, \
     UmapPoincareKmeansSampling, UmapHyperboloidKmeansSampling, UmapHyperboloidKmeansSampling2, \
-    HyperboloidKmeansSampling, PoincareKmeansSampling
+    HyperboloidKmeansSampling, PoincareKmeansSampling, HypNetNormSampling
 from dataset import get_dataset, get_handler
 # from model import get_net
-from model import HyperNet, Net0
+from model import HyperNet, Net0, Net00
 import vgg
 import resnet
 from sklearn.preprocessing import LabelEncoder
@@ -234,7 +234,7 @@ class mlpMod(nn.Module):
         return self.embSize
 
 
-EXPERIMENT_NAME = DATA_NAME + '_' + opts.model + '_' + opts.alg + '_' + str(NUM_QUERY)
+EXPERIMENT_NAME = DATA_NAME + '_' + opts.model + opts.alg + '_' + str(NUM_QUERY) +'_balldim20'
 args['output_dir'] = os.path.join('./badge/output', EXPERIMENT_NAME)
 create_directory(args['output_dir'])
 # load specified network
@@ -258,6 +258,9 @@ elif opts.model == 'HyperNet':
 elif opts.model == 'net0':
     print('Using Net0')
     net = Net0()
+elif opts.model == 'net00':
+    print('Using Net00')
+    net = Net00()
 else:
     print('choose a valid model - mlp, resnet, or vgg', flush=True)
     raise ValueError
@@ -294,6 +297,8 @@ elif opts.alg == 'UmapHyperboloidKmeans2':
     strategy = UmapHyperboloidKmeansSampling2(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'hypNetBadge':
     strategy = HypNetBadgeSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
+elif opts.alg == 'hypNetNorm':
+    strategy = HypNetNormSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'coreset':  # coreset sampling
     strategy = CoreSet(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'entropy':  # entropy-based sampling
@@ -354,32 +359,38 @@ np.savetxt(os.path.join(args['output_dir'],EXPERIMENT_NAME+'_strategy_performanc
 
 if visualize_embedding:
     import cv2
-    import numpy as np
 
     images_dir = os.path.join(args['output_dir'],'images')
-    img_array = []
-    for filename in sorted(os.listdir(images_dir)):
-        img = cv2.imread(os.path.join(images_dir, filename))
-        height, width, layers = img.shape
-        size = (width, height)
-        img_array.append(img)
+    if not os.path.exists(args['output_dir']):
+        create_directory(args['output_dir'])
+    if not os.path.exists(images_dir):
+        create_directory(images_dir)
+    if len(os.listdir(images_dir))>0:
+        img_array = []
+        for filename in sorted(os.listdir(images_dir)):
+            img = cv2.imread(os.path.join(images_dir, filename))
+            height, width, layers = img.shape
+            size = (width, height)
+            img_array.append(img)
 
-    out = cv2.VideoWriter(os.path.join(args['output_dir'],EXPERIMENT_NAME+'_demo_emb.mp4'), cv2.VideoWriter_fourcc(*'MP4V'), 3, size)
+        out = cv2.VideoWriter(os.path.join(args['output_dir'],EXPERIMENT_NAME+'_demo_emb.mp4'), cv2.VideoWriter_fourcc(*'MP4V'), 3, size)
 
-    for i in range(len(img_array)):
-        out.write(img_array[i])
-    out.release()
+        for i in range(len(img_array)):
+            out.write(img_array[i])
+        out.release()
 
 if visualize_learningcurve:
     import matplotlib.pyplot as plt
     results = np.loadtxt(os.path.join(args['output_dir'],EXPERIMENT_NAME+'_strategy_performance.txt'))
     fig = plt.figure()
     plt.plot(results[:,0], results[:,1], label=opts.alg)
+    plt.scatter(results[:,0], results[:,1])
     plt.xlabel('Samples')
     plt.ylabel('Accuracy')
     plt.title(EXPERIMENT_NAME)
     plt.ylim([0.5, 1.0])
     plt.legend()
+    plt.grid('on')
     plt.show()
     fig.savefig(os.path.join(args['output_dir'],EXPERIMENT_NAME + '_learning_curve.png'))
 
