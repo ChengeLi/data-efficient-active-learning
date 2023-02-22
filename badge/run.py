@@ -13,7 +13,7 @@ import swin
 from query_strategies.util import create_directory
 from query_strategies.hyperbolic_embedding_umap_sampling import HypUmapSampling, HypNetBadgeSampling, \
     UmapPoincareKmeansSampling, UmapHyperboloidKmeansSampling, UmapHyperboloidKmeansSampling2, \
-    HyperboloidKmeansSampling, PoincareKmeansSampling, UmapKmeansSampling
+    HyperboloidKmeansSampling, PoincareKmeansSampling, UmapKmeansSampling, BadgePoincareSampling
 from dataset import get_dataset, get_handler
 # from model import get_net
 from model import HyperNet, Net0
@@ -286,6 +286,8 @@ elif opts.alg == 'umap':
     strategy = UmapKmeansSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'PoincareKmeans':
     strategy = PoincareKmeansSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
+elif opts.alg == 'BadgePoincareKmeans':
+    strategy = BadgePoincareSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'HyperboloidKmeans':
     strategy = HyperboloidKmeansSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'UmapPoincareKmeans':
