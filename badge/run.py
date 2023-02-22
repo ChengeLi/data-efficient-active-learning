@@ -344,7 +344,7 @@ for rd in tqdm(range(1, NUM_ROUND + 1)):
 
     # update
     strategy.update(idxs_lb)
-    strategy.train(verbose=False, model_selection=opts.model)
+    strategy.train(verbose=True, model_selection=opts.model)
 
     # round accuracy
     P = strategy.predict(X_te, Y_te)

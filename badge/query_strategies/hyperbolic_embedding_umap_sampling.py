@@ -328,58 +328,25 @@ class UmapHyperboloidKmeansSampling(Strategy):
             all_emb_name = os.path.join(self.output_sample_dir,"emb_{:05d}.npy".format(name))
             del name
         else:
-            image_name = os.path.join(self.output_image_dir,'00000.png')
-            selected_sample_name = os.path.join(self.output_sample_dir,'chosen_00000.csv')
-            all_sample_name = os.path.join(self.output_sample_dir,'all_00000.csv')
-            all_emb_name = os.path.join(self.output_sample_dir,'emb_00000.npy')
-        # Get embedding for all data
-        embedding = self.get_embedding(self.X, self.Y)
-        np.save(all_emb_name, np.concatenate([np.expand_dims(self.Y, axis=1),embedding], axis=1))
-        # Run UMAP to reduce dimension
-        print('Training UMAP on all samples in Euclidean space and returning embeddings in hyperboloid space ...')
-        all_emb = umap.UMAP(random_state=42, output_metric='hyperboloid', tqdm_kwds={'disable': False}).fit_transform(embedding)
-        print('Transform UMAP features to Poincare ball space and normalize in that space ...')
-        # all_emb = self.manifold.expmap0(torch.tensor(standard_embedding), self.curvature)
-        all_emb = (all_emb / max(self.manifold.norm(torch.tensor(all_emb))))
-        # plt.scatter(all_emb.T[0], all_emb.T[1], c=self.Y, s=2, cmap='Spectral')
-        # plt.show()
-        header_ = ['emb_' + str(i) for i in range(np.shape(all_emb)[1])]
-        header_ = ['label'] + header_
-        df = pd.DataFrame(np.concatenate([np.expand_dims((self.Y).numpy(),axis=1), all_emb.numpy()],axis=1), columns=header_)
-        df.to_csv(all_sample_name,index=False)
-
-        # fit unsupervised clusters and plot results
-        print('Running Hyperbolic Kmean++ in Hyperboloid space ...')
-        idxs_unlabeled = np.arange(self.n_pool)[~self.idxs_lb]
-        chosen = self.init_centers_hyp(all_emb[idxs_unlabeled], n)
-        chosen_emb = all_emb[idxs_unlabeled[chosen]]
-
-        header_ = ['label', 'index']
-        df = pd.DataFrame(np.concatenate(
-            [np.expand_dims((self.Y[chosen]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1)], axis=1), columns=header_)
-        df.to_csv(selected_sample_name, index=False)
-        plt.scatter(all_emb.T[0],
-                    all_emb.T[1],
-                    c=self.Y, s=2, cmap='Spectral')
-        plt.scatter(chosen_emb.T[0],
-                    chosen_emb.T[1],
-                    c=self.Y[idxs_unlabeled[chosen]],
-                    edgecolor='black', linewidth=0.3, marker='*', cmap='Spectral')
-        plt.xlim([-1, 1])
-        plt.ylim([-1, 1])
-        # emb = np.concatenate(
-        #     [np.expand_dims(np.arange(0, len(all_emb)), axis=1), all_emb],
-        #     axis=1)[:, 0:3]
-        # emb = pd.DataFrame(emb, columns=['node', 'x', 'y'])
-        # plot_clusters_no_edge(emb, self.Y, chosen_emb[:,0:2], self.classes)
-        plt.savefig(image_name)
-        plt.close('all')
-        del chosen_emb, all_emb, df
-        return idxs_unlabeled[chosen]
-        pass
+            newD = pairwise_distances(X, [mu[-1]]).ravel().astype(float)
+            for i in range(len(X)):
+                if D2[i] >  newD[i]:
+                    centInds[i] = cent
+                    D2[i] = newD[i]
+        print(str(len(mu)) + '\t' + str(sum(D2)), flush=True)
+        if sum(D2) == 0.0: pdb.set_trace()
+        D2 = D2.ravel().astype(float)
+        Ddist = (D2 ** 2)/ sum(D2 ** 2)
+        customDist = stats.rv_discrete(name='custm', values=(np.arange(len(D2)), Ddist))
+        ind = customDist.rvs(size=1)[0]
+        while ind in indsAll: ind = customDist.rvs(size=1)[0]
+        mu.append(X[ind])
+        indsAll.append(ind)
+        cent += 1
+    return indsAll
 
 
-class UmapHyperboloidKmeansSampling2(Strategy):
+class HypUmapSampleing(Strategy):
     def __init__(self, X, Y, idxs_lb, net, handler, args):
         super(UmapHyperboloidKmeansSampling2, self).__init__(X, Y, idxs_lb, net, handler, args)
         self.manifold = Hyperboloid()
@@ -619,6 +586,21 @@ class BaitHypSampling(Strategy):
         # TODO: see if Fisher transformation makes sense in hyperbolic space
         # compute get_exp_grad for all unlabeled
         pass
+
+
+class HypNetBadgeSampling(Strategy):
+    """
+        use hyperbolic layer as last layer,
+        use normal cross entropy as BADGE
+    """
+    def __init__(self, X, Y, idxs_lb, net, handler, args):
+        super(HypNetBadgeSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
+
+    def query(self, n):
+        idxs_unlabeled = np.arange(self.n_pool)[~self.idxs_lb]
+        gradEmbedding = self.get_grad_embedding_for_hyperNet(self.X[idxs_unlabeled], self.Y.numpy()[idxs_unlabeled]).numpy()
+        chosen = init_centers(gradEmbedding, n)
+        return idxs_unlabeled[chosen]
 
 
 class HypNetBadgeSampling(Strategy):

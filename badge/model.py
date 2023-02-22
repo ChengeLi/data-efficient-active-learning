@@ -55,7 +55,6 @@ class Net0(nn.Module):
     def __init__(self):
         super(Net0, self).__init__()
         dim = 10
-
         self.conv1 = nn.Conv2d(1, 20, 5, 1)
         self.conv2 = nn.Conv2d(20, 50, 5, 1)
         self.fc1 = nn.Linear(4 * 4 * 50, 500)
@@ -103,10 +102,6 @@ class Net00(nn.Module):
 
     def get_embedding_dim(self):
         return 2
-
-
-
-
 
 
 class Net1(nn.Module):
