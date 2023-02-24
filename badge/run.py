@@ -243,7 +243,7 @@ class mlpMod(nn.Module):
 
 EXPERIMENT_NAME = DATA_NAME + '_' + opts.model + '_' + opts.alg + '_' + str(NUM_QUERY)
 if opts.model == 'net00':
-    EXPERIMENT_NAME = DATA_NAME + '_' + opts.model +'_embDim20' + '_' + opts.alg + '_' + str(NUM_QUERY)
+    EXPERIMENT_NAME = DATA_NAME + '_' + opts.model +'_embDim20_curvature0-03' + '_' + opts.alg + '_' + str(NUM_QUERY)
 args['output_dir'] = os.path.join('./badge/output', EXPERIMENT_NAME)
 create_directory(args['output_dir'])
 # load specified network

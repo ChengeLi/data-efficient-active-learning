@@ -87,7 +87,7 @@ class BadgePoincareSampling(Strategy):
 
         header_ = ['label', 'index']
         df = pd.DataFrame(np.concatenate(
-            [np.expand_dims((self.Y[chosen]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1)], axis=1),
+            [np.expand_dims((self.Y[idxs_unlabeled[chosen]]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1)], axis=1),
             columns=header_)
         df.to_csv(selected_sample_name, index=False)
 
@@ -99,14 +99,14 @@ class PoincareKmeansSampling(Strategy):
     def __init__(self, X, Y, idxs_lb, net, handler, args):
         super(PoincareKmeansSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
         self.manifold = PoincareBall()
-        self.curvature = 1 / 15  # based on plot 4 in HGCN paper
+        self.curvature = 0.03 #1/10 #1 / 15  # based on plot 4 in HGCN paper
         self.output_dir = args['output_dir']
         self.output_sample_dir = os.path.join(self.output_dir, 'samples')
         create_directory(self.output_sample_dir)
 
     # kmeans ++ initialization
     def init_centers_hyp(self, X, K):
-        ind = np.argmin([self.manifold.norm(torch.tensor(s)) for s in X])
+        ind = np.argmax([self.manifold.norm(torch.tensor(s)) for s in X])
         mu = [X[ind]]
         indsAll = [ind]
         centInds = [0.] * len(X)
@@ -158,7 +158,7 @@ class PoincareKmeansSampling(Strategy):
 
         header_ = ['label', 'index']
         df = pd.DataFrame(np.concatenate(
-            [np.expand_dims((self.Y[chosen]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1)], axis=1),
+            [np.expand_dims((self.Y[idxs_unlabeled[chosen]]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1)], axis=1),
             columns=header_)
         df.to_csv(selected_sample_name, index=False)
 
@@ -229,7 +229,7 @@ class HyperboloidKmeansSampling(Strategy):
 
         header_ = ['label', 'index']
         df = pd.DataFrame(np.concatenate(
-            [np.expand_dims((self.Y[chosen]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1)], axis=1),
+            [np.expand_dims((self.Y[idxs_unlabeled[chosen]]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1)], axis=1),
             columns=header_)
         df.to_csv(selected_sample_name, index=False)
         del embedding, all_emb, df
@@ -310,7 +310,7 @@ class UmapKmeansSampling(Strategy):
 
         header_ = ['label', 'index']
         df = pd.DataFrame(np.concatenate(
-            [np.expand_dims((self.Y[chosen]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1)], axis=1),
+            [np.expand_dims((self.Y[idxs_unlabeled[chosen]]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1)], axis=1),
             columns=header_)
         df.to_csv(selected_sample_name, index=False)
 
@@ -410,7 +410,7 @@ class UmapPoincareKmeansSampling(Strategy):
         header_ = ['emb_' + str(i) for i in range(np.shape(chosen_emb)[1])]
         header_ = ['label', 'index'] + header_
         df = pd.DataFrame(np.concatenate(
-            [np.expand_dims((self.Y[chosen]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1),
+            [np.expand_dims((self.Y[idxs_unlabeled[chosen]]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1),
              chosen_emb.numpy()], axis=1), columns=header_)
         df.to_csv(selected_sample_name, index=False)
         plt.scatter(all_emb.T[0],
@@ -514,7 +514,7 @@ class UmapHyperboloidKmeansSampling(Strategy):
 
         header_ = ['label', 'index']
         df = pd.DataFrame(np.concatenate(
-            [np.expand_dims((self.Y[chosen]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1)], axis=1),
+            [np.expand_dims((self.Y[idxs_unlabeled[chosen]]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1)], axis=1),
             columns=header_)
         df.to_csv(selected_sample_name, index=False)
         plt.scatter(all_emb.T[0],
@@ -537,7 +537,7 @@ class UmapHyperboloidKmeansSampling(Strategy):
         return idxs_unlabeled[chosen]
         header_ = ['label', 'index']
         df = pd.DataFrame(np.concatenate(
-            [np.expand_dims((self.Y[chosen]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1)], axis=1),
+            [np.expand_dims((self.Y[idxs_unlabeled[chosen]]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1)], axis=1),
             columns=header_)
         df.to_csv(selected_sample_name, index=False)
         plt.scatter(all_emb.T[0],
@@ -639,7 +639,7 @@ class UmapHyperboloidKmeansSampling2(Strategy):
 
         header_ = ['label', 'index']
         df = pd.DataFrame(np.concatenate(
-            [np.expand_dims((self.Y[chosen]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1)], axis=1),
+            [np.expand_dims((self.Y[idxs_unlabeled[chosen]]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1)], axis=1),
             columns=header_)
         df.to_csv(selected_sample_name, index=False)
         plt.scatter(all_emb.T[0],
@@ -746,7 +746,7 @@ class HypUmapSampling(Strategy):
         header_ = ['emb_' + str(i) for i in range(np.shape(chosen_emb)[1])]
         header_ = ['label', 'index'] + header_
         df = pd.DataFrame(np.concatenate(
-            [np.expand_dims((self.Y[chosen]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1),
+            [np.expand_dims((self.Y[idxs_unlabeled[chosen]]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1),
              chosen_emb], axis=1), columns=header_)
         df.to_csv(selected_sample_name, index=False)
         plt.scatter(all_emb.T[0],
@@ -868,6 +868,11 @@ class HypNetNormSampling(Strategy):
 
     def __init__(self, X, Y, idxs_lb, net, handler, args):
         super(HypNetNormSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
+        self.output_dir = args['output_dir']
+        self.output_image_dir = os.path.join(self.output_dir,'images')
+        self.output_sample_dir = os.path.join(self.output_dir, 'samples')
+        create_directory(self.output_image_dir)
+        create_directory(self.output_sample_dir)
 
     def init_centers(self, X, K):
         hyper_emb_norm = [np.linalg.norm(s, 2) for s in X]
@@ -875,10 +880,41 @@ class HypNetNormSampling(Strategy):
         return indsAll
 
     def query(self, n):
+        if len(os.listdir(self.output_sample_dir)) != 0:
+            name = int(sorted(os.listdir(self.output_sample_dir))[-1][4:-4]) + 1
+            image_name = os.path.join(self.output_image_dir, "{:05d}.png".format(name))
+            selected_sample_name = os.path.join(self.output_sample_dir, "chosen_{:05d}.csv".format(name))
+            all_emb_name = os.path.join(self.output_sample_dir, "emb_{:05d}.npy".format(name))
+            del name
+        else:
+
+            image_name = os.path.join(self.output_image_dir, '00000.png')
+            selected_sample_name = os.path.join(self.output_sample_dir, 'chosen_00000.csv')
+            all_emb_name = os.path.join(self.output_sample_dir, "emb_00000.npy")
         idxs_unlabeled = np.arange(self.n_pool)[~self.idxs_lb]
-        gradEmbedding = self.get_hyperbolic_embedding_norm(self.X[idxs_unlabeled],
+        embedding = self.get_hyperbolic_embedding(self.X[idxs_unlabeled],
                                                            self.Y.numpy()[idxs_unlabeled]).numpy()
-        chosen = self.init_centers(gradEmbedding, n)
+        chosen = self.init_centers(embedding, n)
+        np.save(all_emb_name, np.concatenate([np.expand_dims(self.Y, axis=1), embedding], axis=1))
+
+        header_ = ['label', 'index']
+        df = pd.DataFrame(np.concatenate(
+            [np.expand_dims((self.Y[idxs_unlabeled[chosen]]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1)], axis=1),
+            columns=header_)
+        df.to_csv(selected_sample_name, index=False)
+
+        plt.scatter(embedding.T[0],
+                    embedding.T[1],
+                    c=self.Y, s=2, cmap='Spectral')
+        plt.scatter(embedding.T[0],
+                    embedding.T[1],
+                    c=self.Y[idxs_unlabeled[chosen]],
+                    edgecolor='black', linewidth=0.3, marker='*', cmap='Spectral')
+        plt.xlim([-1, 1])
+        plt.ylim([-1, 1])
+        plt.savefig(image_name)
+        plt.close('all')
+        del embedding
         return idxs_unlabeled[chosen]
 
 # class UmapKmeansSampling(Strategy):
@@ -952,7 +988,7 @@ class HypNetNormSampling(Strategy):
 #
 #         header_ = ['label', 'index']
 #         df = pd.DataFrame(np.concatenate(
-#             [np.expand_dims((self.Y[chosen]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1)], axis=1), columns=header_)
+#             [np.expand_dims((self.Y[idxs_unlabeled[chosen]]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1)], axis=1), columns=header_)
 #         df.to_csv(selected_sample_name, index=False)
 #
 #         del standard_embedding, df

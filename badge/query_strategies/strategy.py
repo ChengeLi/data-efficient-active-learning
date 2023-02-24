@@ -495,7 +495,7 @@ class Strategy:
 
 
 
-    def get_hyperbolic_embedding_norm(self, X, Y, model=[]):
+    def get_hyperbolic_embedding(self, X, Y, model=[]):
 
         if type(model) == list:
             model = self.clf
