@@ -52,8 +52,20 @@ class PoincareBall(Manifold):
 
     def proj_tan0(self, u, c):
         return u
-    def norm(self, x):
-        return torch.clamp_min(x.norm(dim=-1, keepdim=True, p=2), self.min_norm)
+
+    def norm(self, x, c):
+        # based on Eq2 in Gradient-based Hierarchical Clustering using Continuous Representations of Trees in Hyperbolic Space
+        # norm = torch.clamp_min(x.norm(dim=-1, keepdim=True, p=2), self.min_norm)
+
+
+        # This is just when we put zero for P1 in the dis equation created inf
+        sqrt_c = c ** 0.5
+        dist_c = artanh(
+            sqrt_c * self.mobius_add(torch.zeros_like(x),x, c, dim=-1).norm(dim=-1, p=2, keepdim=False)
+        )
+        dist = dist_c * 2 / sqrt_c
+        return dist
+
     def expmap(self, u, p, c):
         sqrt_c = c ** 0.5
         u_norm = u.norm(dim=-1, p=2, keepdim=True).clamp_min(self.min_norm)

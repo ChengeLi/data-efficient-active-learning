@@ -50,7 +50,7 @@ class BadgePoincareSampling(Strategy):
                         centInds[i] = cent
                         D2[i] = newD[i]
             # print(str(len(mu)) + '\t' + str(sum(D2)), flush=True)
-            if sum(D2) == 0.0: pdb.set_trace()
+            #if sum(D2) == 0.0: pdb.set_trace()
             D2 = D2.ravel().astype(float)
             Ddist = (D2 ** 2) / sum(D2 ** 2)
             customDist = stats.rv_discrete(name='custm', values=(np.arange(len(D2)), Ddist))
@@ -99,14 +99,14 @@ class PoincareKmeansSampling(Strategy):
     def __init__(self, X, Y, idxs_lb, net, handler, args):
         super(PoincareKmeansSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
         self.manifold = PoincareBall()
-        self.curvature = 0.03 #1/10 #1 / 15  # based on plot 4 in HGCN paper
+        self.curvature = 1/15 #1/10 #1 / 15  # based on plot 4 in HGCN paper
         self.output_dir = args['output_dir']
         self.output_sample_dir = os.path.join(self.output_dir, 'samples')
         create_directory(self.output_sample_dir)
 
     # kmeans ++ initialization
     def init_centers_hyp(self, X, K):
-        ind = np.argmax([self.manifold.norm(torch.tensor(s)) for s in X])
+        ind = np.argmax([self.manifold.norm(torch.tensor(s), self.curvature) for s in X])
         mu = [X[ind]]
         indsAll = [ind]
         centInds = [0.] * len(X)
@@ -122,7 +122,7 @@ class PoincareKmeansSampling(Strategy):
                         centInds[i] = cent
                         D2[i] = newD[i]
             # print(str(len(mu)) + '\t' + str(sum(D2)), flush=True)
-            if sum(D2) == 0.0: pdb.set_trace()
+            #if sum(D2) == 0.0: pdb.set_trace()
             D2 = D2.ravel().astype(float)
             Ddist = (D2 ** 2) / sum(D2 ** 2)
             customDist = stats.rv_discrete(name='custm', values=(np.arange(len(D2)), Ddist))
@@ -146,10 +146,11 @@ class PoincareKmeansSampling(Strategy):
         # Get embedding for all data
         embedding = self.get_embedding(self.X, self.Y)
         np.save(all_emb_name, np.concatenate([np.expand_dims(self.Y, axis=1), embedding], axis=1))
+        embedding = (embedding / max(torch.norm(embedding,dim=1)))
 
         print('Transform model emb to Poincare ball space and normalize in that space ...')
         all_emb = self.manifold.expmap0(embedding.clone().detach(), self.curvature)
-        all_emb = (all_emb / max(self.manifold.norm(all_emb)))
+        # all_emb = (all_emb / max(self.manifold.norm(all_emb,self.curvature)))
 
         # fit unsupervised clusters and plot results
         print('Running Hyperbolic Kmean++ in Poincare Ball space ...')
@@ -195,7 +196,7 @@ class HyperboloidKmeansSampling(Strategy):
                         centInds[i] = cent
                         D2[i] = newD[i]
             # print(str(len(mu)) + '\t' + str(sum(D2)), flush=True)
-            if sum(D2) == 0.0: pdb.set_trace()
+            #if sum(D2) == 0.0: pdb.set_trace()
             D2 = D2.ravel().astype(float)
             Ddist = (D2 ** 2) / sum(D2 ** 2)
             customDist = stats.rv_discrete(name='custm', values=(np.arange(len(D2)), Ddist))
@@ -264,7 +265,7 @@ class UmapKmeansSampling(Strategy):
                         centInds[i] = cent
                         D2[i] = newD[i]
             # print(str(len(mu)) + '\t' + str(sum(D2)), flush=True)
-            if sum(D2) == 0.0: pdb.set_trace()
+            #if sum(D2) == 0.0: pdb.set_trace()
             D2 = D2.ravel().astype(float)
             Ddist = (D2 ** 2) / sum(D2 ** 2)
             customDist = stats.rv_discrete(name='custm', values=(np.arange(len(D2)), Ddist))
@@ -347,7 +348,7 @@ class UmapPoincareKmeansSampling(Strategy):
                         centInds[i] = cent
                         D2[i] = newD[i]
             # print(str(len(mu)) + '\t' + str(sum(D2)), flush=True)
-            if sum(D2) == 0.0: pdb.set_trace()
+            #if sum(D2) == 0.0: pdb.set_trace()
             D2 = D2.ravel().astype(float)
             Ddist = (D2 ** 2) / sum(D2 ** 2)
             customDist = stats.rv_discrete(name='custm', values=(np.arange(len(D2)), Ddist))
@@ -464,7 +465,7 @@ class UmapHyperboloidKmeansSampling(Strategy):
                         centInds[i] = cent
                         D2[i] = newD[i]
             # print(str(len(mu)) + '\t' + str(sum(D2)), flush=True)
-            if sum(D2) == 0.0: pdb.set_trace()
+            #if sum(D2) == 0.0: pdb.set_trace()
             D2 = D2.ravel().astype(float)
             Ddist = (D2 ** 2) / sum(D2 ** 2)
             customDist = stats.rv_discrete(name='custm', values=(np.arange(len(D2)), Ddist))
@@ -590,7 +591,7 @@ class UmapHyperboloidKmeansSampling2(Strategy):
                         centInds[i] = cent
                         D2[i] = newD[i]
             # print(str(len(mu)) + '\t' + str(sum(D2)), flush=True)
-            if sum(D2) == 0.0: pdb.set_trace()
+            #if sum(D2) == 0.0: pdb.set_trace()
             D2 = D2.ravel().astype(float)
             Ddist = (D2 ** 2) / sum(D2 ** 2)
             customDist = stats.rv_discrete(name='custm', values=(np.arange(len(D2)), Ddist))
@@ -692,7 +693,7 @@ class HypUmapSampling(Strategy):
                         centInds[i] = cent
                         D2[i] = newD[i]
             # print(str(len(mu)) + '\t' + str(sum(D2)), flush=True)
-            if sum(D2) == 0.0: pdb.set_trace()
+            #if sum(D2) == 0.0: pdb.set_trace()
             D2 = D2.ravel().astype(float)
             Ddist = (D2 ** 2) / sum(D2 ** 2)
             customDist = stats.rv_discrete(name='custm', values=(np.arange(len(D2)), Ddist))
@@ -792,7 +793,7 @@ class BaitHypSampling(Strategy):
                         centInds[i] = cent
                         D2[i] = newD[i]
             # print(str(len(mu)) + '\t' + str(sum(D2)), flush=True)
-            if sum(D2) == 0.0: pdb.set_trace()
+            #if sum(D2) == 0.0: pdb.set_trace()
             D2 = D2.ravel().astype(float)
             Ddist = (D2 ** 2) / sum(D2 ** 2)
             customDist = stats.rv_discrete(name='custm', values=(np.arange(len(D2)), Ddist))
@@ -835,7 +836,7 @@ class HypNetBadgeSampling(Strategy):
                         centInds[i] = cent
                         D2[i] = newD[i]
             # print(str(len(mu)) + '\t' + str(sum(D2)), flush=True)
-            if sum(D2) == 0.0: pdb.set_trace()
+            #if sum(D2) == 0.0: pdb.set_trace()
             D2 = D2.ravel().astype(float)
             Ddist = (D2 ** 2) / sum(D2 ** 2)
             customDist = stats.rv_discrete(name='custm', values=(np.arange(len(D2)), Ddist))
@@ -945,7 +946,7 @@ class HypNetNormSampling(Strategy):
 #                         centInds[i] = cent
 #                         D2[i] = newD[i]
 #             # print(str(len(mu)) + '\t' + str(sum(D2)), flush=True)
-#             if sum(D2) == 0.0: pdb.set_trace()
+#             #if sum(D2) == 0.0: pdb.set_trace()
 #             D2 = D2.ravel().astype(float)
 #             Ddist = (D2 ** 2) / sum(D2 ** 2)
 #             customDist = stats.rv_discrete(name='custm', values=(np.arange(len(D2)), Ddist))
