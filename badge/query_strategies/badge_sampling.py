@@ -46,9 +46,7 @@ import numpy as np
 # from sklearn.exceptions import ConvergenceWarning
 
 from sklearnex import patch_sklearn
-
 from .util import create_directory
-
 patch_sklearn()
 from sklearn.metrics import pairwise_distances
 import pdb

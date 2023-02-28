@@ -94,7 +94,6 @@ class Strategy:
         accCurrent = 0.
         bestAcc = 0.
         attempts = 0
-        # while accCurrent < 0.99:
         while epoch < self.args['max_epoch'] and accCurrent < 0.99: #train for max_epoch epoches at most
             if not isinstance(self.clf, nn.DataParallel):
                 print('enabling multiple gpus')
@@ -441,7 +440,6 @@ class Strategy:
                 x, y = Variable(x.cuda()), Variable(y.cuda())
                 cout, out = model(x) #mlr is after hyperbolic softmax
                 out = out.data.cpu().numpy()
-
                 batchProbs = F.softmax(cout, dim=1).data.cpu().numpy()
                 maxInds = np.argmax(batchProbs,1)
                 if np.inf in out:
@@ -461,7 +459,6 @@ class Strategy:
 
                     if get_raw_embedding:
                         raw_embedding[idxs[j]] = deepcopy(out[j])
-
                 if fix_grad:
                     print('fix gradient to be RiemannianGradient')
                     for ii in range(len(embedding)):
@@ -475,7 +472,6 @@ class Strategy:
                 return embedding, raw_embedding
             else:
                 return embedding, None
-
 
     def get_grad_embedding_hyperbolic_feature(self, X, Y, model=[]):
         """
@@ -542,7 +538,6 @@ class Strategy:
                 for j in range(len(y)):
                     embedding[idxs[j]] = deepcopy(out[j])
             return torch.Tensor(embedding)
-
 
     def save_images_and_embeddings(self, embedding, idxs_unlabeled, chosen):
         ### add visualization, save embedding

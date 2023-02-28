@@ -3,7 +3,6 @@ import os
 import numpy as np
 import pdb
 from sklearnex import patch_sklearn
-
 patch_sklearn()
 import pandas as pd
 import scipy
@@ -94,7 +93,6 @@ class BadgePoincareSampling(Strategy):
 
         del gradEmbedding_poincare, df, gradEmbedding
         return idxs_unlabeled[chosen]
-
 
 class PoincareKmeansSampling(Strategy):
     def __init__(self, X, Y, idxs_lb, net, handler, args):
@@ -402,7 +400,6 @@ class UmapPoincareKmeansSampling(Strategy):
         df = pd.DataFrame(np.concatenate([np.expand_dims((self.Y).numpy(), axis=1), all_emb.numpy()], axis=1),
                           columns=header_)
         df.to_csv(all_sample_name_poincare, index=False)
-
         # fit unsupervised clusters and plot results
         print('Running Hyperbolic Kmean++ in Poincare Ball space ...')
         idxs_unlabeled = np.arange(self.n_pool)[~self.idxs_lb]
@@ -433,8 +430,6 @@ class UmapPoincareKmeansSampling(Strategy):
         plt.close('all')
         del chosen_emb, all_emb, df
         return idxs_unlabeled[chosen]
-
-        pass
 
 
 class UmapHyperboloidKmeansSampling(Strategy):
@@ -694,7 +689,7 @@ class HypUmapSampling(Strategy):
                         centInds[i] = cent
                         D2[i] = newD[i]
             # print(str(len(mu)) + '\t' + str(sum(D2)), flush=True)
-            #if sum(D2) == 0.0: pdb.set_trace()
+            #if sum(D2) == 0.0: pdb.set_trace()\
             D2 = D2.ravel().astype(float)
             Ddist = (D2 ** 2) / sum(D2 ** 2)
             customDist = stats.rv_discrete(name='custm', values=(np.arange(len(D2)), Ddist))
@@ -722,7 +717,6 @@ class HypUmapSampling(Strategy):
         print('Get embedding for all Samples ...')
         embedding = self.get_embedding(self.X, self.Y)
         np.save(all_emb_name, np.concatenate([np.expand_dims(self.Y, axis=1), embedding], axis=1))
-
         # Transform to Hyperboloid model of hyperbolic space
         print('Transform embedding to hyperbolic space using Hyperbloid model ...')
         hypEmbedding = self.manifold.expmap0(embedding, self.curvature)
@@ -860,6 +854,33 @@ class HypNetNormSampling(Strategy):
         indsAll = np.argsort(hyper_emb_norm, axis=0)[:K]  # select the smallest K samples
         return indsAll
 
+    def init_centers(self,X, K):
+        ind = np.argmax([np.linalg.norm(s, 2) for s in X])  # this only make sense for badge
+        mu = [X[ind]]
+        indsAll = [ind]
+        centInds = [0.] * len(X)
+        cent = 0
+        # print('#Samps\tTotal Distance')
+        while len(mu) < K:
+            if len(mu) == 1:
+                D2 = pairwise_distances(X, mu).ravel().astype(float)
+            else:
+                newD = pairwise_distances(X, [mu[-1]]).ravel().astype(float)
+                for i in range(len(X)):
+                    if D2[i] > newD[i]:
+                        centInds[i] = cent
+                        D2[i] = newD[i]
+            # print(str(len(mu)) + '\t' + str(sum(D2)), flush=True)
+            if sum(D2) == 0.0: pdb.set_trace()
+            D2 = D2.ravel().astype(float)
+            Ddist = (D2 ** 2) / sum(D2 ** 2)
+            customDist = stats.rv_discrete(name='custm', values=(np.arange(len(D2)), Ddist))
+            ind = customDist.rvs(size=1)[0]
+            while ind in indsAll: ind = customDist.rvs(size=1)[0]
+            mu.append(X[ind])
+            indsAll.append(ind)
+            cent += 1
+        return indsAll
     def query(self, n):
         idxs_unlabeled = np.arange(self.n_pool)[~self.idxs_lb]
         embedding = self.get_hyperbolic_embedding(self.X, self.Y).numpy()
@@ -868,8 +889,6 @@ class HypNetNormSampling(Strategy):
         chosen = self.init_centers(embedding[idxs_unlabeled], n)
         self.save_images_and_embeddings(embedding, idxs_unlabeled, chosen)
         return idxs_unlabeled[chosen]
-
-
 
 
 class HyperNorm_plus_RiemannianBadge_Sampling(Strategy):

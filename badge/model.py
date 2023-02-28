@@ -58,7 +58,6 @@ class Net0(nn.Module):
     def __init__(self):
         super(Net0, self).__init__()
         dim = 10
-
         self.conv1 = nn.Conv2d(1, 20, 5, 1)
         self.conv2 = nn.Conv2d(20, 50, 5, 1)
         self.fc1 = nn.Linear(4 * 4 * 50, 500)
@@ -101,7 +100,6 @@ class Net00(nn.Module):
         x = F.max_pool2d(x, 2, 2)
         # x = x.view(-1, 4 * 4 * 50)
         x = x.view(-1, 5 * 5 * 50)
-
         e1 = F.relu(self.fc1(x))
         x = F.dropout(e1, training=self.training)
         e2 = F.relu(self.fc2(x))

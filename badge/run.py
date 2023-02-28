@@ -349,13 +349,12 @@ print(type(strategy).__name__, flush=True)
 if type(X_te) == torch.Tensor: X_te = X_te.numpy()
 results = []
 # round 0 accuracy
-strategy.train(verbose=True,model_selection=opts.model)
+strategy.train(verbose=False,model_selection=opts.model)
 P = strategy.predict(X_te, Y_te)
 acc = np.zeros(NUM_ROUND + 1)
 acc[0] = 1.0 * (Y_te == P).sum().item() / len(Y_te)
 print(str(opts.nStart) + '\ttesting accuracy {}'.format(acc[0]), flush=True)
 results.append([sum(idxs_lb), acc[0]])
-
 
 for rd in tqdm(range(1, NUM_ROUND + 1)):
     print('')
@@ -373,7 +372,6 @@ for rd in tqdm(range(1, NUM_ROUND + 1)):
     # update
     strategy.update(idxs_lb)
     strategy.train(verbose=False, model_selection=opts.model)
-
     # round accuracy
     P = strategy.predict(X_te, Y_te)
     acc[rd] = 1.0 * (Y_te == P).sum().item() / len(Y_te)
