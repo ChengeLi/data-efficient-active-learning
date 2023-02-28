@@ -13,7 +13,8 @@ import swin
 from query_strategies.util import create_directory
 from query_strategies.hyperbolic_embedding_umap_sampling import HypUmapSampling, HypNetBadgeSampling, \
     UmapPoincareKmeansSampling, UmapHyperboloidKmeansSampling, UmapHyperboloidKmeansSampling2, \
-    HyperboloidKmeansSampling, PoincareKmeansSampling, HypNetNormSampling, UmapKmeansSampling, BadgePoincareSampling
+    HyperboloidKmeansSampling, PoincareKmeansSampling, HypNetNormSampling, HyperNorm_plus_RiemannianBadge_Sampling,\
+    HypNetBadgePoincareKmeansSampling
 from dataset import get_dataset, get_handler
 # from model import get_net
 from model import HyperNet, Net0, Net00
@@ -179,6 +180,8 @@ if opts.trunc != -1:
     Y_tr = Y_tr[inds]
     opts.nClasses = int(max(Y_tr) + 1)
 
+args['poincare_ball_curvature'] = 1/15
+args['poincare_ball_dim'] = 2
 args['lr'] = opts.lr
 args['modelType'] = opts.model
 args['lamb'] = opts.lamb
@@ -241,9 +244,15 @@ class mlpMod(nn.Module):
         return self.embSize
 
 
-EXPERIMENT_NAME = DATA_NAME + '_' + opts.model + '_' + opts.alg + '_' + str(NUM_QUERY)
 if opts.model == 'net00':
     EXPERIMENT_NAME = DATA_NAME + '_' + opts.model +'_embDim20_curvature-03' + '_' + opts.alg + '_' + str(NUM_QUERY)
+elif opts.model == 'HyperNet':
+    EXPERIMENT_NAME = DATA_NAME + '_' + opts.model + opts.alg + '_' + str(NUM_QUERY) \
+                    +'_balldim{}_c{}'.format(args['poincare_ball_dim'], args['poincare_ball_curvature']) \
+                    +'_normalized'
+else:
+    EXPERIMENT_NAME = DATA_NAME + '_' + opts.model + '_dim20' + opts.alg + '_' + str(NUM_QUERY)
+
 args['output_dir'] = os.path.join('./badge/output', EXPERIMENT_NAME)
 create_directory(args['output_dir'])
 # load specified network
@@ -263,7 +272,7 @@ elif opts.model == 'swin_t':
         net = swin.MyCustomSwinTiny(input_channel=3, pretrained=True) #, pretrained=True
 elif opts.model == 'HyperNet':
     print('Using hypernet')
-    net = HyperNet()
+    net = HyperNet(args)
 elif opts.model == 'net0':
     print('Using Net0')
     net = Net0()
@@ -310,8 +319,14 @@ elif opts.alg == 'UmapHyperboloidKmeans2':
     strategy = UmapHyperboloidKmeansSampling2(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'hypNetBadge':
     strategy = HypNetBadgeSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
+elif opts.alg == 'hypNetBadgePoinKmeans':
+    strategy = HypNetBadgePoincareKmeansSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'hypNetNorm':
     strategy = HypNetNormSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
+elif opts.alg == 'hyperNorm_plus_Rbadge':
+    strategy = HyperNorm_plus_RiemannianBadge_Sampling(X_tr, Y_tr, idxs_lb, net, handler, args)
+# elif opts.alg == 'HypNetNormPoinKmeans':
+#     strategy = HypNetNormPoincareKmeansSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'coreset':  # coreset sampling
     strategy = CoreSet(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'entropy':  # entropy-based sampling
@@ -357,7 +372,7 @@ for rd in tqdm(range(1, NUM_ROUND + 1)):
 
     # update
     strategy.update(idxs_lb)
-    strategy.train(verbose=True, model_selection=opts.model)
+    strategy.train(verbose=False, model_selection=opts.model)
 
     # round accuracy
     P = strategy.predict(X_te, Y_te)

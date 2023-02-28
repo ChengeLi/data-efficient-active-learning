@@ -11,6 +11,10 @@ from tqdm import tqdm
 import pdb
 import resnet
 from torch.distributions.categorical import Categorical
+import os
+import pandas as pd
+from matplotlib import pyplot as plt
+
 class Strategy:
     def __init__(self, X, Y, idxs_lb, net, handler, args):
         self.X = X
@@ -91,14 +95,14 @@ class Strategy:
         bestAcc = 0.
         attempts = 0
         # while accCurrent < 0.99:
-        while epoch < self.args['max_epoch'] and accCurrent < 0.99: #train for 50 epoches at most
+        while epoch < self.args['max_epoch'] and accCurrent < 0.99: #train for max_epoch epoches at most
             if not isinstance(self.clf, nn.DataParallel):
                 print('enabling multiple gpus')
                 self.clf = self.enable_multiple_gpu_model(self.clf)
-            if model_selection == 'HyperNet':
-                accCurrent, lossCurrent = self._hyper_train(epoch, loader_tr, optimizer)
-            else:
-                accCurrent, lossCurrent = self._train(epoch, loader_tr, optimizer)
+            # if model_selection == 'HyperNet':
+            #     accCurrent, lossCurrent = self._hyper_train(epoch, loader_tr, optimizer)
+            # else:
+            accCurrent, lossCurrent = self._train(epoch, loader_tr, optimizer)
             if bestAcc < accCurrent:
                 bestAcc = accCurrent
                 attempts = 0
@@ -411,10 +415,9 @@ class Strategy:
         return torch.Tensor(embedding)
 
 
-    def get_grad_embedding_for_hyperNet(self, X, Y, model=[], fix_grad=False):
+    def get_grad_embedding_for_hyperNet(self, X, Y, model=[], fix_grad=False, RiemannianGradient_c=1, get_raw_embedding=False):
 
         def get_riemannian_gradient(x):
-            RiemannianGradient_c = 1
             scale = (1 - (RiemannianGradient_c * x**2).sum(-1))**2 / 4
             return scale*x
 
@@ -428,6 +431,9 @@ class Strategy:
         model.eval()
         nLab = len(np.unique(Y))
         embedding = np.zeros([len(Y), embDim * nLab])
+        if get_raw_embedding:
+            raw_embedding = np.zeros([len(Y), embDim])
+
         loader_te = DataLoader(self.handler(X, Y, transform=self.args['transformTest']),
                             shuffle=False, **self.args['loader_te_args'])
         with torch.no_grad():
@@ -435,21 +441,40 @@ class Strategy:
                 x, y = Variable(x.cuda()), Variable(y.cuda())
                 cout, out = model(x) #mlr is after hyperbolic softmax
                 out = out.data.cpu().numpy()
+
                 batchProbs = F.softmax(cout, dim=1).data.cpu().numpy()
                 maxInds = np.argmax(batchProbs,1)
+                if np.inf in out:
+                    pdb.set_trace()
+                if np.inf in batchProbs:
+                    pdb.set_trace()
                 for j in range(len(y)):
                     for c in range(nLab):
                         if c == maxInds[j]:
+                            if np.inf in deepcopy(out[j]) * (1 - batchProbs[j][c]):
+                                pdb.set_trace()
                             embedding[idxs[j]][embDim * c : embDim * (c+1)] = deepcopy(out[j]) * (1 - batchProbs[j][c])
                         else:
+                            if np.inf in deepcopy(out[j]) * (-1 * batchProbs[j][c]):
+                                pdb.set_trace()
                             embedding[idxs[j]][embDim * c : embDim * (c+1)] = deepcopy(out[j]) * (-1 * batchProbs[j][c])
+
+                    if get_raw_embedding:
+                        raw_embedding[idxs[j]] = deepcopy(out[j])
+
                 if fix_grad:
                     print('fix gradient to be RiemannianGradient')
                     for ii in range(len(embedding)):
                         for jj in range(embedding.shape[1]):
                             embedding[ii,jj] = get_riemannian_gradient(embedding[ii,jj])
 
-            return torch.Tensor(embedding)
+            if np.inf in embedding:
+                pdb.set_trace()
+
+            if get_raw_embedding:
+                return embedding, raw_embedding
+            else:
+                return embedding, None
 
 
     def get_grad_embedding_hyperbolic_feature(self, X, Y, model=[]):
@@ -492,11 +517,12 @@ class Strategy:
                         else:
                             embedding[idxs[j]][embDim * c : embDim * (c+1)] = deepcopy(out[j]) * (-1 * batchProbs[j][c])
             return torch.Tensor(embedding)
-
 
 
     def get_hyperbolic_embedding(self, X, Y, model=[]):
-
+        """
+        for HypNetNormSampling 
+        """
         if type(model) == list:
             model = self.clf
         
@@ -518,189 +544,39 @@ class Strategy:
             return torch.Tensor(embedding)
 
 
-    def get_grad_embedding_for_hyperNet(self, X, Y, model=[], fix_grad=False):
-
-        def get_riemannian_gradient(x):
-            RiemannianGradient_c = 1
-            scale = (1 - (RiemannianGradient_c * x**2).sum(-1))**2 / 4
-            return scale*x
-
-        if type(model) == list:
-            model = self.clf
-
-        if isinstance(model, nn.DataParallel):
-            embDim = model.module.get_embedding_dim()
+    def save_images_and_embeddings(self, embedding, idxs_unlabeled, chosen):
+        ### add visualization, save embedding
+        if len(os.listdir(self.output_sample_dir)) != 0:
+            name = int(sorted(os.listdir(self.output_sample_dir))[-1][4:-4]) + 1
+            image_name = os.path.join(self.output_image_dir, "{:05d}.png".format(name))
+            selected_sample_name = os.path.join(self.output_sample_dir, "chosen_{:05d}.csv".format(name))
+            all_emb_name = os.path.join(self.output_sample_dir, "emb_{:05d}.npy".format(name))
+            del name
         else:
-            embDim = model.get_embedding_dim()
-        model.eval()
-        nLab = len(np.unique(Y))
-        embedding = np.zeros([len(Y), embDim * nLab])
-        loader_te = DataLoader(self.handler(X, Y, transform=self.args['transformTest']),
-                            shuffle=False, **self.args['loader_te_args'])
-        with torch.no_grad():
-            for x, y, idxs in loader_te:
-                x, y = Variable(x.cuda()), Variable(y.cuda())
-                cout, out = model(x) #mlr is after hyperbolic softmax
-                out = out.data.cpu().numpy()
-                batchProbs = F.softmax(cout, dim=1).data.cpu().numpy()
-                maxInds = np.argmax(batchProbs,1)
-                for j in range(len(y)):
-                    for c in range(nLab):
-                        if c == maxInds[j]:
-                            embedding[idxs[j]][embDim * c : embDim * (c+1)] = deepcopy(out[j]) * (1 - batchProbs[j][c])
-                        else:
-                            embedding[idxs[j]][embDim * c : embDim * (c+1)] = deepcopy(out[j]) * (-1 * batchProbs[j][c])
-                if fix_grad:
-                    print('fix gradient to be RiemannianGradient')
-                    for ii in range(len(embedding)):
-                        for jj in range(embedding.shape[1]):
-                            embedding[ii,jj] = get_riemannian_gradient(embedding[ii,jj])
 
-            return torch.Tensor(embedding)
+            image_name = os.path.join(self.output_image_dir, '00000.png')
+            selected_sample_name = os.path.join(self.output_sample_dir, 'chosen_00000.csv')
+            all_emb_name = os.path.join(self.output_sample_dir, "emb_00000.npy")
 
+        np.save(all_emb_name, np.concatenate([np.expand_dims(self.Y, axis=1), embedding], axis=1))
 
-    def get_grad_embedding_hyperbolic_feature(self, X, Y, model=[]):
-        """
-        the only difference with BADGE is we transform the feature in euclidean space to poincre ball first
-        haven't run this one yet
-        """
-        from manifolds import PoincareBall
-        self.manifold = PoincareBall()
-        if type(model) == list:
-            model = self.clf
-        
-        if isinstance(model, nn.DataParallel):
-            embDim = model.module.get_embedding_dim()
-        else:
-            embDim = model.get_embedding_dim()
+        header_ = ['label', 'index']
+        df = pd.DataFrame(np.concatenate(
+            [np.expand_dims((self.Y[idxs_unlabeled[chosen]]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1)], axis=1),
+            columns=header_)
+        df.to_csv(selected_sample_name, index=False)
 
-        model.eval()
-        nLab = len(np.unique(Y))
-        embedding = np.zeros([len(Y), embDim * nLab])
-        loader_te = DataLoader(self.handler(X, Y, transform=self.args['transformTest']),
-                            shuffle=False, **self.args['loader_te_args'])
-        with torch.no_grad():
-            for x, y, idxs in loader_te:
-                x, y = Variable(x.cuda()), Variable(y.cuda())
-                cout, out = model(x)
+        plt.scatter(embedding.T[0],
+                    embedding.T[1],
+                    c=self.Y, s=2, cmap='Spectral')
 
-                ### here's the hyperbolic transformation
-                out = out.data.cpu().numpy()
-                print('Transform model emb to Poincare ball space and normalize in that space ...')
-                all_emb = self.manifold.expmap0(out.clone().detach(), self.curvature)
-                out = (all_emb / max(self.manifold.norm(all_emb)))
-
-                batchProbs = F.softmax(cout, dim=1).data.cpu().numpy()
-                maxInds = np.argmax(batchProbs,1)
-                for j in range(len(y)):
-                    for c in range(nLab):
-                        if c == maxInds[j]:
-                            embedding[idxs[j]][embDim * c : embDim * (c+1)] = deepcopy(out[j]) * (1 - batchProbs[j][c])
-                        else:
-                            embedding[idxs[j]][embDim * c : embDim * (c+1)] = deepcopy(out[j]) * (-1 * batchProbs[j][c])
-            return torch.Tensor(embedding)
-
-
-
-    def get_hyperbolic_embedding_norm(self, X, Y, model=[]):
-
-        if type(model) == list:
-            model = self.clf
-        
-        if isinstance(model, nn.DataParallel):
-            embDim = model.module.get_embedding_dim()
-        else:
-            embDim = model.get_embedding_dim()
-        model.eval()
-        embedding = np.zeros([len(Y), embDim])
-        loader_te = DataLoader(self.handler(X, Y, transform=self.args['transformTest']),
-                            shuffle=False, **self.args['loader_te_args'])
-        with torch.no_grad():
-            for x, y, idxs in loader_te:
-                x, y = Variable(x.cuda()), Variable(y.cuda())
-                cout, out = model(x)
-                out = out.data.cpu().numpy()
-                for j in range(len(y)):
-                    embedding[idxs[j]] = deepcopy(out[j])
-            return torch.Tensor(embedding)
-
-
-
-
-    def get_grad_embedding_for_hyperNet(self, X, Y, model=[]):
-        if type(model) == list:
-            model = self.clf
-
-        if isinstance(model, nn.DataParallel):
-            embDim = model.module.get_embedding_dim()
-        else:
-            embDim = model.get_embedding_dim()
-        model.eval()
-        nLab = len(np.unique(Y))
-        embedding = np.zeros([len(Y), embDim * nLab])
-        loader_te = DataLoader(self.handler(X, Y, transform=self.args['transformTest']),
-                            shuffle=False, **self.args['loader_te_args'])
-        with torch.no_grad():
-            for x, y, idxs in loader_te:
-                x, y = Variable(x.cuda()), Variable(y.cuda())
-                cout, out = model(x) #mlr is after hyperbolic softmax
-                out = out.data.cpu().numpy()
-                batchProbs = F.softmax(cout, dim=1).data.cpu().numpy()
-                maxInds = np.argmax(batchProbs,1)
-                for j in range(len(y)):
-                    for c in range(nLab):
-                        if c == maxInds[j]:
-                            embedding[idxs[j]][embDim * c : embDim * (c+1)] = deepcopy(out[j]) * (1 - batchProbs[j][c])
-                        else:
-                            embedding[idxs[j]][embDim * c : embDim * (c+1)] = deepcopy(out[j]) * (-1 * batchProbs[j][c])
-            return torch.Tensor(embedding)
-
-
-    def hyp_transformation(emb):
-        import hyptorch.nn as hypnn
-        ## hyperparameters
-        dim = 2 #"Dimension of the Poincare ball"
-        c = 1.0 #"Curvature of the Poincare ball"
-        train_x = False # train the exponential map origin
-        train_c = False # train the Poincare ball curvature
-
-        tp = hypnn.ToPoincare(
-                c=c, train_x=train_x, train_c=train_c, ball_dim=dim
-            )
-        hyper_emb = tp(emb)
-        return hyper_emb
-
-
-
-    # gradient embedding for badge (assumes cross-entropy loss)
-    def get_grad_embedding_hyperbolic_feature(self, X, Y, model=[]):
-        """
-        the only difference with BADGE is we transform the feature in euclidean space to poincre ball first
-        """
-        if type(model) == list:
-            model = self.clf
-        
-        embDim = model.get_embedding_dim()
-        model.eval()
-        nLab = len(np.unique(Y))
-        embedding = np.zeros([len(Y), embDim * nLab])
-        loader_te = DataLoader(self.handler(X, Y, transform=self.args['transformTest']),
-                            shuffle=False, **self.args['loader_te_args'])
-        with torch.no_grad():
-            for x, y, idxs in loader_te:
-                x, y = Variable(x.cuda()), Variable(y.cuda())
-                cout, out = model(x)
-
-                ### here's the hyperbolic transformation
-                out = hyp_transformation(out)
-
-                out = out.data.cpu().numpy()
-                batchProbs = F.softmax(cout, dim=1).data.cpu().numpy()
-                maxInds = np.argmax(batchProbs,1)
-                for j in range(len(y)):
-                    for c in range(nLab):
-                        if c == maxInds[j]:
-                            embedding[idxs[j]][embDim * c : embDim * (c+1)] = deepcopy(out[j]) * (1 - batchProbs[j][c])
-                        else:
-                            embedding[idxs[j]][embDim * c : embDim * (c+1)] = deepcopy(out[j]) * (-1 * batchProbs[j][c])
-            return torch.Tensor(embedding)
+        chosen_emb = embedding[idxs_unlabeled[chosen]]
+        plt.scatter(chosen_emb.T[0],
+                    chosen_emb.T[1],
+                    c=self.Y[idxs_unlabeled[chosen]],
+                    edgecolor='black', linewidth=0.3, marker='*', cmap='Spectral')
+        plt.xlim([-1, 1])
+        plt.ylim([-1, 1])
+        plt.savefig(image_name)
+        plt.close('all')
+        del embedding

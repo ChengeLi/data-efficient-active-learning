@@ -4,7 +4,7 @@ import torch
 
 from manifolds.base import Manifold
 from manifolds.utils.math_utils import artanh, tanh
-
+import pdb
 
 class PoincareBall(Manifold):
     """

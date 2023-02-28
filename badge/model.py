@@ -15,17 +15,19 @@ def get_net(name):
 
 class HyperNet(nn.Module):
     # https://github.com/leymir/hyperbolic-image-embeddings/blob/master/examples/mnist.py
-    def __init__(self):
+    def __init__(self, args):
         ## hyperparameters
-        self.poincare_ball_dim = 20 #"Dimension of the Poincare ball"
-        c = 1.0 #"Curvature of the Poincare ball"
+        self.poincare_ball_dim = args['poincare_ball_dim'] #"Dimension of the Poincare ball"
+        c = args['poincare_ball_curvature'] #1.0 #"Curvature of the Poincare ball"
+        print(f'Using c={c} for HyperNet')
         train_x = False # train the exponential map origin
         train_c = False # train the Poincare ball curvature
 
         super(HyperNet, self).__init__()
-        self.conv1 = nn.Conv2d(1, 20, 5, 1)
+        self.conv1 = nn.Conv2d(3, 20, 5, 1)
         self.conv2 = nn.Conv2d(20, 50, 5, 1)
-        self.fc1 = nn.Linear(4 * 4 * 50, 500)
+        # self.fc1 = nn.Linear(4 * 4 * 50, 500)
+        self.fc1 = nn.Linear(5 * 5 * 50, 500)  #cifar10 original image size is 32x32
         self.fc2 = nn.Linear(500, self.poincare_ball_dim)
         self.tp = hypnn.ToPoincare(
             c=c, train_x=train_x, train_c=train_c, ball_dim=self.poincare_ball_dim
@@ -38,7 +40,8 @@ class HyperNet(nn.Module):
         x = F.max_pool2d(x, 2, 2)
         x = F.relu(self.conv2(x))
         x = F.max_pool2d(x, 2, 2)
-        x = x.view(-1, 4 * 4 * 50)
+        # x = x.view(-1, 4 * 4 * 50)
+        x = x.view(-1, 5 * 5 * 50)
         e1 = F.relu(self.fc1(x))
         e2 = self.fc2(e1)
         e2_tp = self.tp(e2)
@@ -55,6 +58,7 @@ class Net0(nn.Module):
     def __init__(self):
         super(Net0, self).__init__()
         dim = 10
+
         self.conv1 = nn.Conv2d(1, 20, 5, 1)
         self.conv2 = nn.Conv2d(20, 50, 5, 1)
         self.fc1 = nn.Linear(4 * 4 * 50, 500)
@@ -81,9 +85,12 @@ class Net00(nn.Module):
         super(Net00, self).__init__()
         classes = 10
         self.embedding_dim = 20
-        self.conv1 = nn.Conv2d(1, 20, 5, 1)
+
+        self.conv1 = nn.Conv2d(3, 20, 5, 1) #change input channel to 1 or 3 depending on coloed image or not
         self.conv2 = nn.Conv2d(20, 50, 5, 1)
-        self.fc1 = nn.Linear(4 * 4 * 50, 500)
+        # self.fc1 = nn.Linear(4 * 4 * 50, 500) #MNIST original image size is 28x28
+        self.fc1 = nn.Linear(5 * 5 * 50, 500)  #cifar10 original image size is 32x32
+
         self.fc2 = nn.Linear(500, self.embedding_dim) ### mimic poincare ball
         self.fc3 = nn.Linear(self.embedding_dim, classes)
 
@@ -92,7 +99,9 @@ class Net00(nn.Module):
         x = F.max_pool2d(x, 2, 2)
         x = F.relu(self.conv2(x))
         x = F.max_pool2d(x, 2, 2)
-        x = x.view(-1, 4 * 4 * 50)
+        # x = x.view(-1, 4 * 4 * 50)
+        x = x.view(-1, 5 * 5 * 50)
+
         e1 = F.relu(self.fc1(x))
         x = F.dropout(e1, training=self.training)
         e2 = F.relu(self.fc2(x))

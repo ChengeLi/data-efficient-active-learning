@@ -17,6 +17,7 @@ import umap.plot
 # hyperparams
 from manifolds import Hyperboloid, PoincareBall
 from .util import create_directory, plot_clusters_no_edge
+import pdb
 
 PROJ_EPS = 1e-3
 EPS = 1e-15
@@ -772,9 +773,21 @@ class HypUmapSampling(Strategy):
         pass
 
 
-class BaitHypSampling(Strategy):
+class HypNetBadgeSampling(Strategy):
+    """
+        use hyperbolic layer as last layer,
+        use normal cross entropy as BADGE
+    """
     def __init__(self, X, Y, idxs_lb, net, handler, args):
-        super(BaitHypSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
+        super(HypNetBadgeSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
+        self.curvature = args['poincare_ball_curvature']
+
+        self.manifold = PoincareBall()
+        self.output_dir = args['output_dir']
+        self.output_image_dir = os.path.join(self.output_dir,'images')
+        self.output_sample_dir = os.path.join(self.output_dir, 'samples')
+        create_directory(self.output_image_dir)
+        create_directory(self.output_sample_dir)
 
     def init_centers(self, X, K):
         ind = np.argmax([np.linalg.norm(s, 2) for s in X])  # this only make sense for badge
@@ -785,7 +798,10 @@ class BaitHypSampling(Strategy):
         # print('#Samps\tTotal Distance')
         while len(mu) < K:
             if len(mu) == 1:
-                D2 = pairwise_distances(X, mu).ravel().astype(float)
+                try:
+                    D2 = pairwise_distances(X, mu).ravel().astype(float)
+                except:
+                    pdb.set_trace()
             else:
                 newD = pairwise_distances(X, [mu[-1]]).ravel().astype(float)
                 for i in range(len(X)):
@@ -805,37 +821,109 @@ class BaitHypSampling(Strategy):
         return indsAll
 
     def query(self, n):
-        # TODO: see if Fisher transformation makes sense in hyperbolic space
-        # compute get_exp_grad for all unlabeled
-        pass
+        """
+            option 1: use regular gradient in badge
+            option 2: fix grad using riemannian gradient in badge
+            
+        """
+        use_Riemannian_grad_badge = True
 
-
-class HypNetBadgeSampling(Strategy):
-    """
-        use hyperbolic layer as last layer,
-        use normal cross entropy as BADGE
-    """
-
-    def __init__(self, X, Y, idxs_lb, net, handler, args):
-        super(HypNetBadgeSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
-
-    def query(self, n):
         idxs_unlabeled = np.arange(self.n_pool)[~self.idxs_lb]
-        gradEmbedding = self.get_grad_embedding_for_hyperNet(self.X[idxs_unlabeled], self.Y.numpy()[idxs_unlabeled]).numpy()
-        chosen = init_centers(gradEmbedding, n)
+        gradEmbedding, embedding = self.get_grad_embedding_for_hyperNet(self.X, self.Y, 
+                                                             fix_grad=use_Riemannian_grad_badge,
+                                                             RiemannianGradient_c=self.curvature,
+                                                             get_raw_embedding=True)
+        chosen = self.init_centers(gradEmbedding[idxs_unlabeled], n)
+        ## normalizae embedding
+        embedding = (embedding / max(self.manifold.norm(torch.tensor(embedding))))
+        self.save_images_and_embeddings(embedding, idxs_unlabeled, chosen)
         return idxs_unlabeled[chosen]
 
 
-class HypNetBadgeSampling(Strategy):
+
+class HypNetNormSampling(Strategy):
     """
-        use hyperbolic layer as last layer,
-        use normal cross entropy as BADGE
+        use hyperbolic embedding's norm as a measure of uncertainty
     """
+
     def __init__(self, X, Y, idxs_lb, net, handler, args):
-        super(HypNetBadgeSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
+        super(HypNetNormSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
+        self.manifold = PoincareBall()
+        self.output_dir = args['output_dir']
+        self.output_image_dir = os.path.join(self.output_dir,'images')
+        self.output_sample_dir = os.path.join(self.output_dir, 'samples')
+        create_directory(self.output_image_dir)
+        create_directory(self.output_sample_dir)
 
     def init_centers(self, X, K):
-        ind = np.argmax([np.linalg.norm(s, 2) for s in X])  # this only make sense for badge
+        hyper_emb_norm = [np.linalg.norm(s, 2) for s in X]
+        indsAll = np.argsort(hyper_emb_norm, axis=0)[:K]  # select the smallest K samples
+        return indsAll
+
+    def query(self, n):
+        idxs_unlabeled = np.arange(self.n_pool)[~self.idxs_lb]
+        embedding = self.get_hyperbolic_embedding(self.X, self.Y).numpy()
+        embedding = (embedding / max(self.manifold.norm(torch.tensor(embedding))))
+        ## normalizae embedding
+        chosen = self.init_centers(embedding[idxs_unlabeled], n)
+        self.save_images_and_embeddings(embedding, idxs_unlabeled, chosen)
+        return idxs_unlabeled[chosen]
+
+
+
+
+class HyperNorm_plus_RiemannianBadge_Sampling(Strategy):
+    """
+        use a combination of hyperbolic embedding's norm
+        and Riemannian badge (badge with fix grad)
+
+    """
+    def __init__(self, X, Y, idxs_lb, net, handler, args):
+        super(HyperNorm_plus_RiemannianBadge_Sampling, self).__init__(X, Y, idxs_lb, net, handler, args)
+        self.HypNetNormSampler = HypNetNormSampling(X, Y, idxs_lb, net, handler, args)
+        self.HypNetBadgeSampler = HypNetBadgeSampling(X, Y, idxs_lb, net, handler, args)
+
+    def train(self, reset=True, optimizer=0, verbose=True, data=[], net=[], model_selection=None):       
+        super(HyperNorm_plus_RiemannianBadge_Sampling, self).train(reset, optimizer, verbose, data, net, model_selection)
+        ### init the sampling strategy's clf due to the train() is not called for them
+        self.HypNetNormSampler.clf = self.clf
+        self.HypNetBadgeSampler.clf = self.clf
+
+ 
+    def query(self, n):
+        self.HypNetNormSampler.update(self.idxs_lb)
+        ids_selected_by_norm = self.HypNetNormSampler.query(n//2)
+
+        self.idxs_lb[ids_selected_by_norm] = True
+        self.HypNetBadgeSampler.update(self.idxs_lb)
+        ids_selected_by_RieBadge = self.HypNetBadgeSampler.query(n-n//2)
+
+        self.idxs_lb[ids_selected_by_RieBadge] = True
+        selected_inds = set(ids_selected_by_norm).union(set(ids_selected_by_RieBadge))
+        assert len(selected_inds)==n
+        return [ii for ii in selected_inds]
+
+
+class HypNetBadgePoincareKmeansSampling(Strategy):
+    """
+        use hyperbolic layer as last layer,
+        use normal cross entropy as BADGE.
+        use Poincare Kmeans
+    """
+    def __init__(self, X, Y, idxs_lb, net, handler, args):
+        super(HypNetBadgePoincareKmeansSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
+        self.curvature = args['poincare_ball_curvature']
+        self.manifold = PoincareBall()
+
+        self.output_dir = args['output_dir']
+        self.output_image_dir = os.path.join(self.output_dir,'images')
+        self.output_sample_dir = os.path.join(self.output_dir, 'samples')
+        create_directory(self.output_image_dir)
+        create_directory(self.output_sample_dir)
+
+    # kmeans ++ initialization
+    def init_centers_hyp(self, X, K):
+        ind = np.argmax([np.linalg.norm(s, 2) for s in X])
         mu = [X[ind]]
         indsAll = [ind]
         centInds = [0.] * len(X)
@@ -843,9 +931,9 @@ class HypNetBadgeSampling(Strategy):
         # print('#Samps\tTotal Distance')
         while len(mu) < K:
             if len(mu) == 1:
-                D2 = pairwise_distances(X, mu).ravel().astype(float)
+                D2 = self.manifold.sqdist(X, mu[-1], self.curvature).ravel().numpy().astype(float)
             else:
-                newD = pairwise_distances(X, [mu[-1]]).ravel().astype(float)
+                newD = self.manifold.sqdist(X, mu[-1], self.curvature).ravel().numpy().astype(float)
                 for i in range(len(X)):
                     if D2[i] > newD[i]:
                         centInds[i] = cent
@@ -870,66 +958,12 @@ class HypNetBadgeSampling(Strategy):
         use_Riemannian_grad_badge = True
 
         idxs_unlabeled = np.arange(self.n_pool)[~self.idxs_lb]
-        gradEmbedding = self.get_grad_embedding_for_hyperNet(self.X[idxs_unlabeled], self.Y.numpy()[idxs_unlabeled],
-                                                            fix_grad=use_Riemannian_grad_badge).numpy()
-        chosen = self.init_centers(gradEmbedding, n)
-        return idxs_unlabeled[chosen]
 
-
-class HypNetNormSampling(Strategy):
-    """
-        use hyperbolic embedding's norm as a measure of uncertainty
-    """
-
-    def __init__(self, X, Y, idxs_lb, net, handler, args):
-        super(HypNetNormSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
-        self.output_dir = args['output_dir']
-        self.output_image_dir = os.path.join(self.output_dir,'images')
-        self.output_sample_dir = os.path.join(self.output_dir, 'samples')
-        create_directory(self.output_image_dir)
-        create_directory(self.output_sample_dir)
-
-    def init_centers(self, X, K):
-        hyper_emb_norm = [np.linalg.norm(s, 2) for s in X]
-        indsAll = np.argsort(hyper_emb_norm, axis=0)[:K]  # select the smallest K samples
-        return indsAll
-
-    def query(self, n):
-        if len(os.listdir(self.output_sample_dir)) != 0:
-            name = int(sorted(os.listdir(self.output_sample_dir))[-1][4:-4]) + 1
-            image_name = os.path.join(self.output_image_dir, "{:05d}.png".format(name))
-            selected_sample_name = os.path.join(self.output_sample_dir, "chosen_{:05d}.csv".format(name))
-            all_emb_name = os.path.join(self.output_sample_dir, "emb_{:05d}.npy".format(name))
-            del name
-        else:
-
-            image_name = os.path.join(self.output_image_dir, '00000.png')
-            selected_sample_name = os.path.join(self.output_sample_dir, 'chosen_00000.csv')
-            all_emb_name = os.path.join(self.output_sample_dir, "emb_00000.npy")
-        idxs_unlabeled = np.arange(self.n_pool)[~self.idxs_lb]
-        embedding = self.get_hyperbolic_embedding(self.X[idxs_unlabeled],
-                                                           self.Y.numpy()[idxs_unlabeled]).numpy()
-        chosen = self.init_centers(embedding, n)
-        np.save(all_emb_name, np.concatenate([np.expand_dims(self.Y, axis=1), embedding], axis=1))
-
-        header_ = ['label', 'index']
-        df = pd.DataFrame(np.concatenate(
-            [np.expand_dims((self.Y[idxs_unlabeled[chosen]]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1)], axis=1),
-            columns=header_)
-        df.to_csv(selected_sample_name, index=False)
-
-        plt.scatter(embedding.T[0],
-                    embedding.T[1],
-                    c=self.Y, s=2, cmap='Spectral')
-        plt.scatter(embedding.T[0],
-                    embedding.T[1],
-                    c=self.Y[idxs_unlabeled[chosen]],
-                    edgecolor='black', linewidth=0.3, marker='*', cmap='Spectral')
-        plt.xlim([-1, 1])
-        plt.ylim([-1, 1])
-        plt.savefig(image_name)
-        plt.close('all')
-        del embedding
+        gradEmbedding, embedding = self.get_grad_embedding_for_hyperNet(self.X[idxs_unlabeled], self.Y.numpy()[idxs_unlabeled], 
+                                                             fix_grad=use_Riemannian_grad_badge,
+                                                             RiemannianGradient_c=self.curvature)
+        chosen = self.init_centers_hyp(torch.tensor(gradEmbedding), n)
+        self.save_images_and_embeddings(embedding, idxs_unlabeled, chosen)
         return idxs_unlabeled[chosen]
 
 # class UmapKmeansSampling(Strategy):
