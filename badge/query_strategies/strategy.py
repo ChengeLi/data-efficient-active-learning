@@ -39,8 +39,6 @@ class Strategy:
             x, y = Variable(x.cuda()), Variable(y.cuda())
             optimizer.zero_grad()
             out, e1 = self.clf(x)
-            print(out.size())
-            print(y.size())
             loss = F.cross_entropy(out, y)
             accFinal += torch.sum((torch.max(out,1)[1] == y).float()).data.item()
             loss.backward()
