@@ -81,7 +81,7 @@ class Cub200(Dataset):
     # tgz_md5 = '97eceeb196236b17998738112f37df78'
     # gdrive_id = 'hbzc_P1FuxMkcabkgn9ZKinBwW683j45'
 
-    def __init__(self, root, train=True, transform=None, crop=1.2, target_size=(64, 64)):
+    def __init__(self, root, train=True, transform=None, crop=1.2, target_size=(32, 32)):
         """
             Load the dataset.
             Input:
