@@ -271,7 +271,7 @@ class mlpMod(nn.Module):
 
 EXPERIMENT_NAME = DATA_NAME + '_' + opts.model + '_' + opts.alg + '_' + str(NUM_QUERY)
 if opts.model == 'net00':
-    EXPERIMENT_NAME = DATA_NAME + '_' + opts.model + '_embDim20_c1-15' + '_UncertaintyDiversity_' + opts.alg + '_' + str(
+    EXPERIMENT_NAME = DATA_NAME + '_' + opts.model + '_embDim20_c1-15'  + opts.alg + '_' + str(
         NUM_QUERY)
 args['output_dir'] = os.path.join('./badge/output', EXPERIMENT_NAME)
 create_directory(args['output_dir'])

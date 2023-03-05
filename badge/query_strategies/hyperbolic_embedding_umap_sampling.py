@@ -251,7 +251,7 @@ class PoincareKmeansSampling(Strategy):
     def __init__(self, X, Y, idxs_lb, net, handler, args):
         super(PoincareKmeansSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
         self.manifold = PoincareBall()
-        self.curvature = 1 #0.03 0.5 #1/10 #1 / 15  # based on plot 4 in HGCN paper
+        self.curvature = 1/15 #0.03 0.5 #1/10 #1 / 15  # based on plot 4 in HGCN paper
         self.output_dir = args['output_dir']
         self.output_sample_dir = os.path.join(self.output_dir, 'samples')
         create_directory(self.output_sample_dir)
