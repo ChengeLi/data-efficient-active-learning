@@ -6,6 +6,9 @@ from torch.utils.data import Dataset
 from PIL import Image
 from torchvision import transforms
 
+from cub200_dataset import Cub200
+
+
 def get_dataset(name, path):
     if name == 'MNIST':
         return get_MNIST(path)
@@ -15,6 +18,8 @@ def get_dataset(name, path):
         return get_SVHN(path)
     elif name == 'CIFAR10':
         return get_CIFAR10(path)
+    elif name == 'CUB':
+        return get_CUB(path)
 
 def get_MNIST(path):
     raw_tr = datasets.MNIST(path + '/MNIST', train=True, download=True)
@@ -51,6 +56,20 @@ def get_CIFAR10(path):
     X_te = data_te.data
     Y_te = torch.from_numpy(np.array(data_te.targets))
     return X_tr, Y_tr, X_te, Y_te
+
+def get_CUB(path):
+    dataset = Cub200(root='./data')
+    X_tr, Y_tr, X_te, Y_te = dataset.get_train_test_data()
+    X_tr = np.array(X_tr,dtype=np.float32)
+    X_te = np.array(X_te,dtype=np.float32)
+    Y_tr = torch.from_numpy(np.array(Y_tr))
+    Y_te = torch.from_numpy(np.array(Y_te))
+
+    # X_tr, Y_tr, X_te, Y_te = dataset.get_train_test_data()
+    # X_tr = data_tr.data
+    # Y_tr = torch.from_numpy(np.array(data_tr.targets))
+    # X_te = data_te.data
+    # Y_te = torch.from_numpy(np.array(data_te.targets))
     return X_tr, Y_tr, X_te, Y_te
 
 def get_handler(name):

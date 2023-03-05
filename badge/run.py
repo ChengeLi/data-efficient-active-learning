@@ -10,10 +10,12 @@ from tqdm import tqdm
 # from torch.nn import Linear, Sequential
 
 import swin
+from cub200_dataset import ImageJitter
 from query_strategies.util import create_directory
 from query_strategies.hyperbolic_embedding_umap_sampling import HypUmapSampling, HypNetBadgeSampling, \
     UmapPoincareKmeansSampling, UmapHyperboloidKmeansSampling, UmapHyperboloidKmeansSampling2, \
-    HyperboloidKmeansSampling, PoincareKmeansSampling, HypNetNormSampling, UmapKmeansSampling, BadgePoincareSampling
+    HyperboloidKmeansSampling, PoincareKmeansSampling, HypNetNormSampling, UmapKmeansSampling, BadgePoincareSampling, \
+    PoincareKmeansSamplingNew
 from dataset import get_dataset, get_handler
 # from model import get_net
 from model import HyperNet, Net0, Net00
@@ -31,6 +33,7 @@ import pdb
 from query_strategies import RandomSampling, BadgeSampling, \
     BaselineSampling, LeastConfidence, MarginSampling, \
     EntropySampling, ActiveLearningByLearning, BaitSampling, CoreSet
+
 # , , ActiveLearningByLearning, \
 # LeastConfidenceDropout, MarginSamplingDropout, EntropySamplingDropout, \
 # KMeansSampling, KCenterGreedy, BALDDropout, CoreSet, \
@@ -85,7 +88,8 @@ args_pool = {'MNIST':
                  {'n_epoch': 20,
                   'max_epoch': 100,
                   'transform': transforms.Compose(
-                     [transforms.ToTensor(), transforms.Normalize((0.4377, 0.4438, 0.4728), (0.1980, 0.2010, 0.1970))]),
+                      [transforms.ToTensor(),
+                       transforms.Normalize((0.4377, 0.4438, 0.4728), (0.1980, 0.2010, 0.1970))]),
                   'loader_tr_args': {'batch_size': 64, 'num_workers': 1},
                   'loader_te_args': {'batch_size': 1000, 'num_workers': 1},
                   'optimizer_args': {'lr': 0.01, 'momentum': 0.5}},
@@ -93,19 +97,43 @@ args_pool = {'MNIST':
                  {'n_epoch': 3,
                   'max_epoch': 100,
                   'transform': transforms.Compose([
-                     transforms.RandomCrop(32, padding=4),
-                     transforms.RandomHorizontalFlip(),
-                     transforms.ToTensor(),
-                     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
-                 ]),
+                      transforms.RandomCrop(32, padding=4),
+                      transforms.RandomHorizontalFlip(),
+                      transforms.ToTensor(),
+                      transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
+                  ]),
                   'loader_tr_args': {'batch_size': 128, 'num_workers': 1},
                   'loader_te_args': {'batch_size': 1000, 'num_workers': 1},
                   'optimizer_args': {'lr': 0.05, 'momentum': 0.3},
                   'transformTest': transforms.Compose([transforms.ToTensor(),
                                                        transforms.Normalize((0.4914, 0.4822, 0.4465),
+                                                                            (0.2470, 0.2435, 0.2616))])},
+             'CUB':
+                 {'n_epoch': 3,
+                  'max_epoch': 300,
+                  'transform': transforms.Compose(
+                [
+                    transforms.RandomResizedCrop(84),
+                    ImageJitter(dict(Brightness=0.4, Contrast=0.4, Color=0.4)),
+                    transforms.RandomHorizontalFlip(),
+                    transforms.ToTensor(),
+                    transforms.Normalize(
+                        np.array([0.485, 0.456, 0.406]), np.array([0.229, 0.224, 0.225])
+                    ),
+                ]
+            ),
+                  'loader_tr_args': {'batch_size': 64, 'num_workers': 1},
+                  'loader_te_args': {'batch_size': 1000, 'num_workers': 1},
+                  'optimizer_args': {'lr': 0.01, 'momentum': 0.3},
+                  'transformTest': transforms.Compose([transforms.ToTensor(),
+                                                       transforms.Normalize((0.4914, 0.4822, 0.4465),
                                                                             (0.2470, 0.2435, 0.2616))])}
              }
-opts.nClasses = 10
+if DATA_NAME in ['MNIST', 'CIFAR10']:
+    opts.nClasses = 10
+elif DATA_NAME=='CUB':
+    opts.nClasses = 200
+
 if opts.model == 'swin_t':
     args_pool['max_epoch'] = 200
     args_pool['CIFAR10']['transform'] = transforms.Compose([
@@ -243,7 +271,8 @@ class mlpMod(nn.Module):
 
 EXPERIMENT_NAME = DATA_NAME + '_' + opts.model + '_' + opts.alg + '_' + str(NUM_QUERY)
 if opts.model == 'net00':
-    EXPERIMENT_NAME = DATA_NAME + '_' + opts.model +'_embDim20_curvature-03' + '_' + opts.alg + '_' + str(NUM_QUERY)
+    EXPERIMENT_NAME = DATA_NAME + '_' + opts.model + '_embDim20_c1-15' + '_UncertaintyDiversity_' + opts.alg + '_' + str(
+        NUM_QUERY)
 args['output_dir'] = os.path.join('./badge/output', EXPERIMENT_NAME)
 create_directory(args['output_dir'])
 # load specified network
@@ -260,7 +289,7 @@ elif opts.model == 'swin_t':
     if opts.data == 'MNIST':
         net = swin.MyCustomSwinTiny(input_channel=1)
     else:
-        net = swin.MyCustomSwinTiny(input_channel=3, pretrained=True) #, pretrained=True
+        net = swin.MyCustomSwinTiny(input_channel=3, pretrained=True)  # , pretrained=True
 elif opts.model == 'HyperNet':
     print('Using hypernet')
     net = HyperNet()
@@ -269,7 +298,7 @@ elif opts.model == 'net0':
     net = Net0()
 elif opts.model == 'net00':
     print('Using Net00')
-    net = Net00()
+    net = Net00(dataset=DATA_NAME)
 else:
     print('choose a valid model - mlp, resnet, or vgg', flush=True)
     raise ValueError
@@ -298,6 +327,8 @@ elif opts.alg == 'umap':
     strategy = UmapKmeansSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'PoincareKmeans':
     strategy = PoincareKmeansSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
+elif opts.alg == 'PoincareKmeansNew':
+    strategy = PoincareKmeansSamplingNew(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'BadgePoincareKmeans':
     strategy = BadgePoincareSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'HyperboloidKmeans':
@@ -334,13 +365,12 @@ print(type(strategy).__name__, flush=True)
 if type(X_te) == torch.Tensor: X_te = X_te.numpy()
 results = []
 # round 0 accuracy
-strategy.train(verbose=True,model_selection=opts.model)
+strategy.train(verbose=True, model_selection=opts.model)
 P = strategy.predict(X_te, Y_te)
 acc = np.zeros(NUM_ROUND + 1)
 acc[0] = 1.0 * (Y_te == P).sum().item() / len(Y_te)
 print(str(opts.nStart) + '\ttesting accuracy {}'.format(acc[0]), flush=True)
 results.append([sum(idxs_lb), acc[0]])
-
 
 for rd in tqdm(range(1, NUM_ROUND + 1)):
     print('')
@@ -368,18 +398,18 @@ for rd in tqdm(range(1, NUM_ROUND + 1)):
     if opts.rounds > 0 and rd == (opts.rounds - 1): break
 
 results = np.asarray(results)
-np.savetxt(os.path.join(args['output_dir'],EXPERIMENT_NAME+'_strategy_performance.txt'), results)
+np.savetxt(os.path.join(args['output_dir'], EXPERIMENT_NAME + '_strategy_performance.txt'), results)
 
 if visualize_embedding:
     import cv2
     import numpy as np
 
-    images_dir = os.path.join(args['output_dir'],'images')
+    images_dir = os.path.join(args['output_dir'], 'images')
     if not os.path.exists(args['output_dir']):
         create_directory(args['output_dir'])
     if not os.path.exists(images_dir):
         create_directory(images_dir)
-    if len(os.listdir(images_dir))>0:
+    if len(os.listdir(images_dir)) > 0:
         img_array = []
         for filename in sorted(os.listdir(images_dir)):
             img = cv2.imread(os.path.join(images_dir, filename))
@@ -387,7 +417,8 @@ if visualize_embedding:
             size = (width, height)
             img_array.append(img)
 
-        out = cv2.VideoWriter(os.path.join(args['output_dir'],EXPERIMENT_NAME+'_demo_emb.mp4'), cv2.VideoWriter_fourcc(*'MP4V'), 3, size)
+        out = cv2.VideoWriter(os.path.join(args['output_dir'], EXPERIMENT_NAME + '_demo_emb.mp4'),
+                              cv2.VideoWriter_fourcc(*'MP4V'), 3, size)
 
         for i in range(len(img_array)):
             out.write(img_array[i])
@@ -395,15 +426,15 @@ if visualize_embedding:
 
 if visualize_learningcurve:
     import matplotlib.pyplot as plt
-    results = np.loadtxt(os.path.join(args['output_dir'],EXPERIMENT_NAME+'_strategy_performance.txt'))
+
+    results = np.loadtxt(os.path.join(args['output_dir'], EXPERIMENT_NAME + '_strategy_performance.txt'))
     fig = plt.figure()
-    plt.plot(results[:,0], results[:,1], label=opts.alg)
-    plt.scatter(results[:,0], results[:,1])
+    plt.plot(results[:, 0], results[:, 1], label=opts.alg)
+    plt.scatter(results[:, 0], results[:, 1])
     plt.xlabel('Samples')
     plt.ylabel('Accuracy')
     plt.title(EXPERIMENT_NAME)
     plt.ylim([0.5, 1.0])
     plt.legend()
     plt.grid('on')
-    fig.savefig(os.path.join(args['output_dir'],EXPERIMENT_NAME + '_learning_curve.png'))
-
+    fig.savefig(os.path.join(args['output_dir'], EXPERIMENT_NAME + '_learning_curve.png'))
