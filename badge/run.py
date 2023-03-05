@@ -279,7 +279,7 @@ create_directory(args['output_dir'])
 if opts.model == 'mlp':
     net = mlpMod(opts.dim, embSize=opts.nEmb)
 elif opts.model == 'resnet':
-    net = resnet.ResNet18()
+    net = resnet.ResNet18(num_classes=opts.nClasses)
 elif opts.model == 'vgg':
     net = vgg.VGG('VGG16')
 elif opts.model == 'lin':
