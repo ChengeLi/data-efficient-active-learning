@@ -6,11 +6,12 @@ import pandas as pd
 import torch
 from PIL import Image
 from torchvision.datasets.folder import default_loader
-from torchvision.datasets.utils import download_url
+# from torchvision.datasets.utils import download_url
 from torch.utils.data import Dataset
 from PIL import ImageEnhance
-from scipy import io, misc
-import pdb
+# import matplotlib.pyplot as plt
+# from scipy import io, misc
+# import pdb
 # import requests
 
 # def download_file_from_google_drive(id, destination):
@@ -123,9 +124,9 @@ class Cub200(Dataset):
         self.data_test = self._data[self._data.is_training_img == 0]
         self._boxes = [line.split()[1:] for line in
                        open(os.path.join(self.root,'CUB_200_2011', 'bounding_boxes.txt'), 'r')]
-        self.data_train.insert(4, 'bbox', np.array(self._boxes)[list(self._data.is_training_img == 1)].tolist())
+        self.data_train.insert(4, 'bbox', np.array(self._boxes)[list(data.is_training_img == 1)].tolist())
         self.data_train.reset_index(inplace=True)
-        self.data_test.insert(4, 'bbox', np.array(self._boxes)[list(self._data.is_training_img == 0)].tolist())
+        self.data_test.insert(4, 'bbox', np.array(self._boxes)[list(data.is_training_img == 0)].tolist())
         self.data_test.reset_index(inplace=True)
         # self._raw_dimension = np.zeros((len(self.data), 2), dtype=int)
         self.classnames = [line.split()[1] for line in
@@ -135,18 +136,18 @@ class Cub200(Dataset):
         # if download:
         #     self._download()
 
-        if not self._check_integrity():
-            raise RuntimeError('Dataset not found or corrupted.' +
-                               ' You can use download=True to download it')
-
-    def _check_integrity(self):
-
-        for index, row in self._data.iterrows():
-            filepath = os.path.join(self.root, self.base_folder, row.filepath)
-            if not os.path.isfile(filepath):
-                print(filepath)
-                return False
-        return True
+    #     if not self._check_integrity():
+    #         raise RuntimeError('Dataset not found or corrupted.' +
+    #                            ' You can use download=True to download it')
+    #
+    # def _check_integrity(self):
+    #
+    #     for index, row in self._data.iterrows():
+    #         filepath = os.path.join(self.root, self.base_folder, row.filepath)
+    #         if not os.path.isfile(filepath):
+    #             print(filepath)
+    #             return False
+    #     return True
     def get_train_test_data(self):
         # import matplotlib.pyplot as plt
         X_tr = []
@@ -155,7 +156,8 @@ class Cub200(Dataset):
         for index, row in self.data_train.iterrows():
             # print(row['filepath'], row['target'])
             image = self._read(row['filepath'], row['bbox'])
-            image = image.resize(self.target_size)
+            if self.target_size[0]!=224:
+                image = image.resize(self.target_size)
             if len(np.asarray(image.copy()).shape)==3:
                 X_tr.append(np.asarray(image.copy(),dtype=np.float32).T)
                 Y_tr.append(row['target']-1)  # Targets start at 1 by default, so shift to 0
@@ -181,11 +183,54 @@ class Cub200(Dataset):
 
     def _read(self, filepath, bbox):
         image = imread_rgb(os.path.join(self.image_path, filepath))
-        xmin, ymin, xmax, ymax = self._get_cropped_coordinates(image, bbox)
+        if not self.center_crop:
+            xmin, ymin, xmax, ymax = self._get_cropped_coordinates(image, bbox)
+        else:
+            imwidth, imheight = image.size
+            # if self.target_size[0] == 224:
+            # resize the image short side to 256 then center crop with size 224
+            if imwidth <= imheight:
+                new_width = 256
+                new_height = int(np.round(new_width * imheight / imwidth))
+                image = image.resize((new_width, new_height), Image.LANCZOS)
+            elif imheight < imwidth:
+                new_height = 256
+                new_width = int(np.round(new_height * imwidth / imheight))
+                image = image.resize((new_width, new_height), Image.LANCZOS)
+            xmin, ymin, xmax, ymax = self._get_center_cropped_coordinates(image)
+
         image = image.crop((xmin, ymin, xmax, ymax))
+
+
+        # plt.imshow(image)
+        # plt.show()
         return image
 
+    def _get_center_cropped_coordinates(self, image):
+        """
+        Center crops images based on the method followed in
+        Hyperbolic Vision Transformers: Combining Improvements in Metric Learning
+        :param image: original images
+        :return: returns the center cropped image coordinate based on target_sise (224,224)
+        """
+        target_width, target_height = 224, 224
+        imwidth, imheight = image.size
+        xmin = int((imwidth - target_width)/2)
+        ymin = int((imheight - target_height)/2)
+        xmax = int((imwidth + target_width)/2)
+        ymax = int((imheight + target_height)/2)
+        if xmax - xmin <= 0 or ymax - ymin <= 0:
+            raise ValueError("The cropped bounding box has size 0.")
+
+        return xmin, ymin, xmax, ymax
+
     def _get_cropped_coordinates(self, image, bbox):
+        """
+        Crops images based on bbox info provided in dataset
+        :param image: original images
+        :param bbox: bbox coordinates provided by CUB dataset
+        :return: returns the cropped images based on bbox
+        """
         imwidth, imheight = image.size
         if self._crop is not False:
             x, y, width, height = np.array(bbox, dtype=np.float)
@@ -216,16 +261,16 @@ class Cub200(Dataset):
     #     with tarfile.open(os.path.join(self.root, self.filename), "r:gz") as tar:
     #         tar.extractall(path=self.root)
 
-    def __len__(self):
-        return len(self._data)
-
-    def __getitem__(self, idx):
-        sample = self._data.iloc[idx]
-        path = os.path.join(self.root, self.base_folder, sample.filepath)
-        target = sample.target - 1  # Targets start at 1 by default, so shift to 0
-        img = self.loader(path)
-        print('CUB self.transform ', self.transform)
-        if self.transform is not None:
-            img = self.transform(img)
-
-        return img, target
+    # def __len__(self):
+    #     return len(self._data)
+    #
+    # def __getitem__(self, idx):
+    #     sample = self._data.iloc[idx]
+    #     path = os.path.join(self.root, self.base_folder, sample.filepath)
+    #     target = sample.target - 1  # Targets start at 1 by default, so shift to 0
+    #     img = self.loader(path)
+    #
+    #     if self.transform is not None:
+    #         img = self.transform(img)
+    #
+    #     return img, target

@@ -262,6 +262,7 @@ class Strategy:
 
         self.clf.eval()
         P = torch.zeros(len(Y)).long()
+        del X, Y
         with torch.no_grad():
             for x, y, idxs in loader_te:
                 x, y = Variable(x.cuda()), Variable(y.cuda())

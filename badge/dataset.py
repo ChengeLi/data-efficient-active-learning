@@ -1,5 +1,7 @@
 from __future__ import print_function
 from __future__ import division
+import os.path
+
 import numpy as np
 import pdb
 import torch
@@ -181,7 +183,7 @@ class BaseDataset(torch.utils.data.Dataset):
         def img_load(index):
             im = PIL.Image.open(self.im_paths[index])
             # convert gray to rgb
-            if len(list(im.split())) == 1 : im = im.convert('RGB') 
+            if len(list(im.split())) == 1 : im = im.convert('RGB')
             if self.transform is not None:
                 im = self.transform(im)
             return im
@@ -209,10 +211,10 @@ class CUBirds(BaseDataset):
             self.classes = range(0,100)
         elif self.mode == 'eval':
             self.classes = range(100,200)
-        
+
         BaseDataset.__init__(self, self.root, self.mode, self.transform)
         index = 0
-        for i in torchvision.datasets.ImageFolder(root = 
+        for i in torchvision.datasets.ImageFolder(root =
                 os.path.join(self.root, 'images')).imgs:
             # i[1]: label, i[0]: root
             y = i[1]

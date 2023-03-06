@@ -62,10 +62,12 @@ torch.manual_seed(10)
 random.seed(10)
 np.random.seed(10)
 # parameters
+DATA_NAME = opts.data
+# if DATA_NAME =='CUB':
+#     opts.nEnd = 5890
 NUM_INIT_LB = opts.nStart
 NUM_QUERY = opts.nQuery
 NUM_ROUND = int((opts.nEnd - NUM_INIT_LB) / opts.nQuery)
-DATA_NAME = opts.data
 # regularization settings for bait
 opts.lamb = 1
 visualize_embedding = True
@@ -103,8 +105,8 @@ args_pool = {'MNIST':
                       transforms.ToTensor(),
                       transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
                   ]),
-                  'loader_tr_args': {'batch_size': 128, 'num_workers': 0},
-                  'loader_te_args': {'batch_size': 1000, 'num_workers': 0},
+                  'loader_tr_args': {'batch_size': 128, 'num_workers': 1},
+                  'loader_te_args': {'batch_size': 1000, 'num_workers': 1},
                   'optimizer_args': {'lr': 0.05, 'momentum': 0.3},
                   'transformTest': transforms.Compose([transforms.ToTensor(),
                                                        transforms.Normalize((0.4914, 0.4822, 0.4465),
@@ -301,7 +303,7 @@ elif 'HyperNet' in opts.model:
                     +'_balldim{}_c{}'.format(args['poincare_ball_dim'], args['poincare_ball_curvature']) \
                     +'clipr' # + '_newlossonly_batchsize250'
 else:
-    EXPERIMENT_NAME = DATA_NAME + '_' + opts.model + '_dim20' + opts.alg + '_' + str(NUM_QUERY)
+    EXPERIMENT_NAME = DATA_NAME + '_' + opts.model + '_' + opts.alg + '_' + str(NUM_QUERY)
 
 print('EXPERIMENT_NAME={}'.format(EXPERIMENT_NAME))
 
@@ -415,7 +417,7 @@ print(type(strategy).__name__, flush=True)
 if type(X_te) == torch.Tensor: X_te = X_te.numpy()
 results = []
 # round 0 accuracy
-strategy.train(verbose=False, model_selection=opts.model)
+strategy.train(verbose=True, model_selection=opts.model)
 P = strategy.predict(X_te, Y_te)
 acc = np.zeros(NUM_ROUND + 1)
 acc[0] = 1.0 * (Y_te == P).sum().item() / len(Y_te)
@@ -443,8 +445,12 @@ for rd in tqdm(range(1, NUM_ROUND + 1)):
     acc[rd] = 1.0 * (Y_te == P).sum().item() / len(Y_te)
     print(str(sum(idxs_lb)) + '\t' + 'testing accuracy {}'.format(acc[rd]), flush=True)
     results.append([sum(idxs_lb), acc[rd]])
-    if sum(~strategy.idxs_lb) < opts.nQuery: break
-    if opts.rounds > 0 and rd == (opts.rounds - 1): break
+    if sum(~strategy.idxs_lb) < opts.nQuery:
+        print('1')
+        break
+    if opts.rounds > 0 and rd == (opts.rounds - 1):
+        print('2')
+        break
 
 results = np.asarray(results)
 np.savetxt(os.path.join(args['output_dir'], EXPERIMENT_NAME + '_strategy_performance.txt'), results)
