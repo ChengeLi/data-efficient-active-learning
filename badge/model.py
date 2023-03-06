@@ -80,31 +80,63 @@ class Net0(nn.Module):
 
 class Net00(nn.Module):
     ### This is hyperNet without the last layer
-    def __init__(self):
+    def __init__(self, dataset):
         super(Net00, self).__init__()
-        classes = 10
+        if dataset=='MNIST':
+            classes = 10
+            input_channel = 1
+            self.flattened_dim = 4 * 4 * 50
+        elif dataset=='CIFAR10':
+            classes = 10
+            input_channel = 3
+            self.flattened_dim = 5 * 5 * 50
+        elif dataset=='CUB':
+            classes = 200
+            input_channel = 3
+            self.flattened_dim = 50 * 13 * 13
+
         self.embedding_dim = 20
 
-        self.conv1 = nn.Conv2d(3, 20, 5, 1) #change input channel to 1 or 3 depending on coloed image or not
+        # self.conv1 = nn.Conv2d(1, 20, 5, 1) #MNIST
+        self.conv1 = nn.Conv2d(input_channel, 20, 5, 1)
         self.conv2 = nn.Conv2d(20, 50, 5, 1)
-        # self.fc1 = nn.Linear(4 * 4 * 50, 500) #MNIST original image size is 28x28
-        self.fc1 = nn.Linear(5 * 5 * 50, 500)  #cifar10 original image size is 32x32
-
+        self.fc1 = nn.Linear(self.flattened_dim, 500)
         self.fc2 = nn.Linear(500, self.embedding_dim) ### mimic poincare ball
         self.fc3 = nn.Linear(self.embedding_dim, classes)
 
     def forward(self, x):
+        # print('0')
+        # print(x.size())
         x = F.relu(self.conv1(x))
+        # print('1')
+        # print(x.size())
         x = F.max_pool2d(x, 2, 2)
+        # print('2')
+        # print(x.size())
         x = F.relu(self.conv2(x))
+        # print('3')
+        # print(x.size())
         x = F.max_pool2d(x, 2, 2)
-        # x = x.view(-1, 4 * 4 * 50)
-        x = x.view(-1, 5 * 5 * 50)
+        # print('4')
+        # print(x.size())
+        x = x.view(-1, self.flattened_dim)
+        # print('5')
+        # print(x.size())
         e1 = F.relu(self.fc1(x))
+        # print('6')
+        # print(x.size())
         x = F.dropout(e1, training=self.training)
+        # print('7')
+        # print(x.size())
         e2 = F.relu(self.fc2(x))
+        # print('8')
+        # print(x.size())
         x = F.dropout(e2, training=self.training)
+        # print('9')
+        # print(x.size())
         x = self.fc3(x)
+        # print('10')
+        # print(x.size())
         return x, e2
 
     def get_embedding_dim(self):
