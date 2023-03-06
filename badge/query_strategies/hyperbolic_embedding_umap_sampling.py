@@ -298,24 +298,24 @@ class PoincareKmeansSampling(Strategy):
         # Get embedding for all data
         embedding = self.get_embedding(self.X, self.Y)
         np.save(all_emb_name, np.concatenate([np.expand_dims(self.Y, axis=1), embedding], axis=1))
-        embedding = (embedding / max(torch.norm(embedding,dim=1)))
+        embedding = (embedding / max(torch.norm(embedding,dim=1))).clone().detach()
 
         print('Transform model emb to Poincare ball space and normalize in that space ...')
-        all_emb = self.manifold.expmap0(embedding.clone().detach(), self.curvature)
+        all_emb = self.manifold.expmap0(embedding, self.curvature)
         # all_emb = (all_emb / max(self.manifold.norm(all_emb,self.curvature)))
-
+        del embedding
         # fit unsupervised clusters and plot results
         print('Running Hyperbolic Kmean++ in Poincare Ball space ...')
         idxs_unlabeled = np.arange(self.n_pool)[~self.idxs_lb]
         chosen = self.init_centers_hyp(all_emb[idxs_unlabeled], n)
-
+        del all_emb
         header_ = ['label', 'index']
         df = pd.DataFrame(np.concatenate(
             [np.expand_dims((self.Y[idxs_unlabeled[chosen]]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1)], axis=1),
             columns=header_)
         df.to_csv(selected_sample_name, index=False)
 
-        del all_emb, df, embedding
+        del df
         return idxs_unlabeled[chosen]
 
 

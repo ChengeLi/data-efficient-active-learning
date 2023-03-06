@@ -77,7 +77,10 @@ class ResNet(nn.Module):
         self.layer2 = self._make_layer(block, 32, num_blocks[1], stride=2)
         self.layer3 = self._make_layer(block, 64, num_blocks[2], stride=2)
         self.layer4 = self._make_layer(block, 128, num_blocks[3], stride=2)
-        self.linear = nn.Linear(self.embDim, num_classes)
+        self.linear1 = nn.Linear(25088, 1024)
+        self.linear2 = nn.Linear(1024, 512)
+        self.linear3 = nn.Linear(512, self.embDim)
+        self.linear4 = nn.Linear(self.embDim, num_classes)
     def _make_layer(self, block, planes, num_blocks, stride):
         strides = [stride] + [1]*(num_blocks-1)
         layers = []
@@ -100,9 +103,14 @@ class ResNet(nn.Module):
         # print('6',out.size())
         out = F.avg_pool2d(out, 4)
         # print('7',out.size())
-        emb = out.view(out.size(0), -1)
+        out = out.view(out.size(0), -1)
+        # print('8', out.size())
+        out = self.linear1(out)
+        out = self.linear2(out)
+        emb = self.linear3(out)
+        # emb = out.view(out.size(0), -1)
         # print('8',emb.size())
-        out = self.linear(emb)
+        out = self.linear4(emb)
         # print('9',out.size())
         return out, emb
     def get_embedding_dim(self):
@@ -115,8 +123,8 @@ def ResNet18(num_classes=10):
 def ResNet34():
     return ResNet(BasicBlock, [3,4,6,3])
 
-def ResNet50():
-    return ResNet(Bottleneck, [3,4,6,3])
+def ResNet50(num_classes=10):
+    return ResNet(Bottleneck, [3,4,6,3],num_classes=num_classes)
 
 def ResNet101():
     return ResNet(Bottleneck, [3,4,23,3])

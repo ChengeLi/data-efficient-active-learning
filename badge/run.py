@@ -61,10 +61,12 @@ torch.manual_seed(10)
 random.seed(10)
 np.random.seed(10)
 # parameters
+DATA_NAME = opts.data
+if DATA_NAME =='CUB':
+    opts.nEnd = 5890
 NUM_INIT_LB = opts.nStart
 NUM_QUERY = opts.nQuery
 NUM_ROUND = int((opts.nEnd - NUM_INIT_LB) / opts.nQuery)
-DATA_NAME = opts.data
 # regularization settings for bait
 opts.lamb = 1
 visualize_embedding = True
@@ -122,8 +124,8 @@ args_pool = {'MNIST':
                     ),
                 ]
             ),
-                  'loader_tr_args': {'batch_size': 64, 'num_workers': 1},
-                  'loader_te_args': {'batch_size': 1000, 'num_workers': 1},
+                  'loader_tr_args': {'batch_size': 32, 'num_workers': 1},
+                  'loader_te_args': {'batch_size': 32, 'num_workers': 1},
                   'optimizer_args': {'lr': 0.01, 'momentum': 0.3},
                   'transformTest': transforms.Compose([transforms.ToTensor(),
                                                        transforms.Normalize((0.4914, 0.4822, 0.4465),
@@ -280,6 +282,8 @@ if opts.model == 'mlp':
     net = mlpMod(opts.dim, embSize=opts.nEmb)
 elif opts.model == 'resnet':
     net = resnet.ResNet18(num_classes=opts.nClasses)
+elif opts.model == 'resnet50':
+    net = resnet.ResNet50(num_classes=opts.nClasses)
 elif opts.model == 'vgg':
     net = vgg.VGG('VGG16')
 elif opts.model == 'lin':
@@ -394,8 +398,12 @@ for rd in tqdm(range(1, NUM_ROUND + 1)):
     acc[rd] = 1.0 * (Y_te == P).sum().item() / len(Y_te)
     print(str(sum(idxs_lb)) + '\t' + 'testing accuracy {}'.format(acc[rd]), flush=True)
     results.append([sum(idxs_lb), acc[rd]])
-    if sum(~strategy.idxs_lb) < opts.nQuery: break
-    if opts.rounds > 0 and rd == (opts.rounds - 1): break
+    if sum(~strategy.idxs_lb) < opts.nQuery:
+        print('1')
+        break
+    if opts.rounds > 0 and rd == (opts.rounds - 1):
+        print('2')
+        break
 
 results = np.asarray(results)
 np.savetxt(os.path.join(args['output_dir'], EXPERIMENT_NAME + '_strategy_performance.txt'), results)

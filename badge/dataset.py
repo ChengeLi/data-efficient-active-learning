@@ -1,3 +1,5 @@
+import os.path
+
 import numpy as np
 import pdb
 import torch
@@ -58,18 +60,18 @@ def get_CIFAR10(path):
     return X_tr, Y_tr, X_te, Y_te
 
 def get_CUB(path):
-    dataset = Cub200(root='./data')
-    X_tr, Y_tr, X_te, Y_te = dataset.get_train_test_data()
-    X_tr = np.array(X_tr,dtype=np.float32)
-    X_te = np.array(X_te,dtype=np.float32)
-    Y_tr = torch.from_numpy(np.array(Y_tr))
-    Y_te = torch.from_numpy(np.array(Y_te))
-
+    # dataset = Cub200(root='./data')
     # X_tr, Y_tr, X_te, Y_te = dataset.get_train_test_data()
-    # X_tr = data_tr.data
-    # Y_tr = torch.from_numpy(np.array(data_tr.targets))
-    # X_te = data_te.data
-    # Y_te = torch.from_numpy(np.array(data_te.targets))
+    # X_tr = np.array(X_tr,dtype=np.float32)
+    # X_te = np.array(X_te,dtype=np.float32)
+    # Y_tr = torch.from_numpy(np.array(Y_tr))
+    # Y_te = torch.from_numpy(np.array(Y_te))
+    # del dataset
+    X_tr = np.load(os.path.join(path,'CUB_200_2011','224', 'X_tr.npy'))
+    Y_tr = torch.from_numpy(np.load(os.path.join(path,'CUB_200_2011','224', 'Y_tr.npy')))
+    X_te = np.load(os.path.join(path,'CUB_200_2011','224', 'X_te.npy'))
+    Y_te = torch.from_numpy(np.load(os.path.join(path,'CUB_200_2011','224', 'Y_te.npy')))
+
     return X_tr, Y_tr, X_te, Y_te
 
 def get_handler(name):
