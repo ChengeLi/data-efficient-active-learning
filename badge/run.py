@@ -44,7 +44,7 @@ parser.add_argument('--alg', help='acquisition algorithm', type=str, default='ra
 parser.add_argument('--did', help='openML dataset index, if any', type=int, default=0)
 parser.add_argument('--lr', help='learning rate', type=float, default=1e-4)
 parser.add_argument('--model', help='model - resnet, vgg, or mlp', type=str, default='mlp')
-parser.add_argument('--path', help='data path', type=str, default='data')
+parser.add_argument('--path', help='data path', type=str, default='./data')
 parser.add_argument('--data', help='dataset (non-openML)', type=str, default='')
 parser.add_argument('--nQuery', help='number of points to query in a batch', type=int, default=100)
 parser.add_argument('--nStart', help='number of points to start', type=int, default=100)
@@ -62,11 +62,7 @@ random.seed(10)
 np.random.seed(10)
 # parameters
 DATA_NAME = opts.data
-if DATA_NAME =='CUB':
-    opts.nEnd = 5890
-NUM_INIT_LB = opts.nStart
-NUM_QUERY = opts.nQuery
-NUM_ROUND = int((opts.nEnd - NUM_INIT_LB) / opts.nQuery)
+
 # regularization settings for bait
 opts.lamb = 1
 visualize_embedding = True
@@ -115,9 +111,9 @@ args_pool = {'MNIST':
                   'max_epoch': 300,
                   'transform': transforms.Compose(
                 [
-                    transforms.RandomResizedCrop(84),
-                    ImageJitter(dict(Brightness=0.4, Contrast=0.4, Color=0.4)),
-                    transforms.RandomHorizontalFlip(),
+                    # transforms.RandomResizedCrop(84),
+                    # ImageJitter(dict(Brightness=0.4, Contrast=0.4, Color=0.4)),
+                    # transforms.RandomHorizontalFlip(),
                     transforms.ToTensor(),
                     transforms.Normalize(
                         np.array([0.485, 0.456, 0.406]), np.array([0.229, 0.224, 0.225])
@@ -126,10 +122,12 @@ args_pool = {'MNIST':
             ),
                   'loader_tr_args': {'batch_size': 32, 'num_workers': 1},
                   'loader_te_args': {'batch_size': 32, 'num_workers': 1},
-                  'optimizer_args': {'lr': 0.01, 'momentum': 0.3},
+                  'optimizer_args': {'lr': 0.001, 'momentum': 0.3},
                   'transformTest': transforms.Compose([transforms.ToTensor(),
-                                                       transforms.Normalize((0.4914, 0.4822, 0.4465),
-                                                                            (0.2470, 0.2435, 0.2616))])}
+                                                       transforms.Normalize(
+                                                           np.array([0.485, 0.456, 0.406]),
+                                                           np.array([0.229, 0.224, 0.225])
+                                                       )])}
              }
 if DATA_NAME in ['MNIST', 'CIFAR10']:
     opts.nClasses = 10
@@ -213,10 +211,15 @@ args['lr'] = opts.lr
 args['modelType'] = opts.model
 args['lamb'] = opts.lamb
 if 'CIFAR' in opts.data: args['lamb'] = 1e-2
-
 # start experiment
 n_pool = len(Y_tr)
 n_test = len(Y_te)
+if DATA_NAME =='CUB':
+    opts.nEnd = n_pool
+NUM_INIT_LB = opts.nStart
+NUM_QUERY = opts.nQuery
+NUM_ROUND = int((opts.nEnd - NUM_INIT_LB) / opts.nQuery)
+
 print('number of labeled pool: {}'.format(NUM_INIT_LB), flush=True)
 print('number of unlabeled pool: {}'.format(n_pool - NUM_INIT_LB), flush=True)
 print('number of testing pool: {}'.format(n_test), flush=True)
@@ -409,7 +412,6 @@ for rd in tqdm(range(1, NUM_ROUND + 1)):
 
 results = np.asarray(results)
 np.savetxt(os.path.join(args['output_dir'], EXPERIMENT_NAME + '_strategy_performance.txt'), results)
-
 if visualize_embedding:
     import cv2
     import numpy as np
@@ -433,6 +435,7 @@ if visualize_embedding:
         for i in range(len(img_array)):
             out.write(img_array[i])
         out.release()
+
 
 if visualize_learningcurve:
     import matplotlib.pyplot as plt
