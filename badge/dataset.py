@@ -74,6 +74,18 @@ def get_CUB(path, args):
     # Y_tr = torch.from_numpy(np.array(data_tr.targets))
     # X_te = data_te.data
     # Y_te = torch.from_numpy(np.array(data_te.targets))
+    # # del dataset
+    # X_tr = np.load(os.path.join(path,'CUB_200_2011','224', 'X_tr.npy'))
+    # # Y_tr = torch.from_numpy(np.load(os.path.join(path,'CUB_200_2011','224', 'Y_tr.npy')))
+    # Y_tr = np.load(os.path.join(path,'CUB_200_2011','224', 'Y_tr.npy'))
+    # X_te = np.load(os.path.join(path,'CUB_200_2011','224', 'X_te.npy'))
+    # # Y_te = torch.from_numpy(np.load(os.path.join(path,'CUB_200_2011','224', 'Y_te.npy')))
+    # Y_te = np.load(os.path.join(path,'CUB_200_2011','224', 'Y_te.npy'))
+    # lt = len(X_te)
+    # X_tr = np.concatenate([X_tr, X_te[0:int(lt / 2 + 5), :, :, :]], axis=0)
+    # Y_tr = torch.from_numpy(np.concatenate([Y_tr, Y_te[0:int(lt / 2 + 5)]], axis=0))
+    # X_te = X_te[int(lt / 2 + 5):, :, :, :]
+    # Y_te = torch.from_numpy(Y_te[int(lt / 2 + 5):])
     return X_tr, Y_tr, X_te, Y_te
 
 def get_handler(name):

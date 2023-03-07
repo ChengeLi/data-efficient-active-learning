@@ -62,6 +62,7 @@ random.seed(10)
 np.random.seed(10)
 # parameters
 DATA_NAME = opts.data
+
 # if DATA_NAME =='CUB':
 #     opts.nEnd = 5890
 NUM_INIT_LB = opts.nStart
@@ -237,10 +238,15 @@ args['lr'] = opts.lr
 args['modelType'] = opts.model
 args['lamb'] = opts.lamb
 if 'CIFAR' in opts.data: args['lamb'] = 1e-2
-
 # start experiment
 n_pool = len(Y_tr)
 n_test = len(Y_te)
+if DATA_NAME =='CUB':
+    opts.nEnd = n_pool
+NUM_INIT_LB = opts.nStart
+NUM_QUERY = opts.nQuery
+NUM_ROUND = int((opts.nEnd - NUM_INIT_LB) / opts.nQuery)
+
 print('number of labeled pool: {}'.format(NUM_INIT_LB), flush=True)
 print('number of unlabeled pool: {}'.format(n_pool - NUM_INIT_LB), flush=True)
 print('number of testing pool: {}'.format(n_test), flush=True)
@@ -455,7 +461,6 @@ for rd in tqdm(range(1, NUM_ROUND + 1)):
 
 results = np.asarray(results)
 np.savetxt(os.path.join(args['output_dir'], EXPERIMENT_NAME + '_strategy_performance.txt'), results)
-
 if visualize_embedding:
     import cv2
 
@@ -478,6 +483,7 @@ if visualize_embedding:
         for i in range(len(img_array)):
             out.write(img_array[i])
         out.release()
+
 
 if visualize_learningcurve:
     import matplotlib.pyplot as plt
