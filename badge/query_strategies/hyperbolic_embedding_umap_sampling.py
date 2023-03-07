@@ -61,9 +61,11 @@ def entropy_score_np(prob_dist):
 
 def entropy_score(prob_dist):
         """
+        https://github.com/rmunro/pytorch_active_learning/blob/master/uncertainty_sampling.py
+        https://towardsdatascience.com/uncertainty-sampling-cheatsheet-ec57bc067c0b
         Returns the uncertainty score of a probability distribution using
         entropy
-
+        Higher entropy value indicates that the model is highly uncertain about the class membership.
         Assumes probability distribution is a pytorch tensor, like:
             tensor([0.0321, 0.6439, 0.0871, 0.2369])
 
@@ -71,12 +73,108 @@ def entropy_score(prob_dist):
             prob_dist -- a pytorch tensor of real numbers between 0 and 1 that total to 1.0
             sorted -- if the probability distribution is pre-sorted from largest to smallest
         """
-        log_probs = prob_dist * torch.log2(prob_dist)  # multiply each probability by its base 2 log
-        raw_entropy = 0 - torch.sum(log_probs)
+        entropy_score_list = []
+        for pdst in prob_dist:
+            log_probs = pdst * torch.log2(pdst)  # multiply each probability by its base 2 log
+            raw_entropy = 0 - torch.sum(log_probs)
 
-        normalized_entropy = raw_entropy / math.log2(prob_dist.numel())
+            normalized_entropy = raw_entropy / math.log2(pdst.numel())
+            entropy_score_list.append(normalized_entropy.item())
 
-        return normalized_entropy.item()
+        return np.array(entropy_score_list)
+
+
+
+class MEALSampling(Strategy):
+    def __init__(self, X, Y, idxs_lb, net, handler, args):
+        super(MEALSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
+        self.output_dir = args['output_dir']
+        # self.output_image_dir = os.path.join(self.output_dir,'images')
+        self.output_sample_dir = os.path.join(self.output_dir, 'samples')
+        # create_directory(self.output_image_dir)
+        create_directory(self.output_sample_dir)
+
+    # kmeans ++ initialization
+    def init_centers(self, X, K):
+        ind = np.argmax([np.linalg.norm(s, 2) for s in X])
+        mu = [X[ind]]
+        indsAll = [ind]
+        centInds = [0.] * len(X)
+        cent = 0
+        # print('#Samps\tTotal Distance')
+        # t1 = time()
+        while len(mu) < K:
+            if len(mu) == 1:
+                D2 = pairwise_distances(X, mu).ravel().astype(float)
+            else:
+                newD = pairwise_distances(X, [mu[-1]]).ravel().astype(float)
+                for i in range(len(X)):
+                    if D2[i] > newD[i]:
+                        centInds[i] = cent
+                        D2[i] = newD[i]
+            # print(str(len(mu)) + '\t' + str(sum(D2)), flush=True)
+            #if sum(D2) == 0.0: pdb.set_trace()
+            D2 = D2.ravel().astype(float)
+            Ddist = (D2 ** 2) / sum(D2 ** 2)
+            customDist = stats.rv_discrete(name='custm', values=(np.arange(len(D2)), Ddist))
+            ind = customDist.rvs(size=1)[0]
+            while ind in indsAll: ind = customDist.rvs(size=1)[0]
+            mu.append(X[ind])
+            indsAll.append(ind)
+            cent += 1
+        # t2 = time()
+        # print(f'init centers took {t2 - t1} seconds')
+        return indsAll
+
+    def query(self, n):
+
+        if len(os.listdir(self.output_sample_dir)) != 0:
+            name = int(sorted(os.listdir(self.output_sample_dir))[-1][4:-4]) + 1
+            selected_sample_name = os.path.join(self.output_sample_dir, "chosen_{:05d}.csv".format(name))
+            all_sample_name_euclidean = os.path.join(self.output_sample_dir, "all_euclidean_{:05d}.csv".format(name))
+            all_emb_name = os.path.join(self.output_sample_dir, "emb_{:05d}.npy".format(name))
+            del name
+        else:
+            selected_sample_name = os.path.join(self.output_sample_dir, 'chosen_00000.csv')
+            all_sample_name_euclidean = os.path.join(self.output_sample_dir, 'all_euclidean_00000.csv')
+            all_emb_name = os.path.join(self.output_sample_dir, 'emb_00000.npy')
+        n_uncertainty = int(0.75*n)
+        n_diversity = int(n-n_uncertainty)
+        # Get embedding for all data
+        embedding = self.get_embedding(self.X, self.Y)
+        np.save(all_emb_name, np.concatenate([np.expand_dims(self.Y, axis=1), embedding], axis=1))
+
+        # Run UMAP to reduce dimension
+        print('Training UMAP on all samples in Euclidean space ...')
+        standard_embedding = umap.UMAP(n_components=10, random_state=42, tqdm_kwds={'disable': False}).fit_transform(
+            embedding)
+
+        header_ = ['emb_' + str(i) for i in range(np.shape(standard_embedding)[1])]
+        header_ = ['label'] + header_
+        df = pd.DataFrame(np.concatenate([np.expand_dims((self.Y).numpy(), axis=1), standard_embedding], axis=1),
+                          columns=header_)
+        df.to_csv(all_sample_name_euclidean, index=False)
+
+        print('Running Kmean++ in Euclidean space ...')
+        idxs_unlabeled = np.arange(self.n_pool)[~self.idxs_lb]
+        prob = self.predict_prob(self.X[idxs_unlabeled], self.Y[idxs_unlabeled])
+        entropy_scores = entropy_score(prob)
+        chosen_uncertainty = np.argsort(entropy_scores)[::-1][0:n_uncertainty]
+        dummy = [True]*len(idxs_unlabeled)
+        for p in chosen_uncertainty:
+            dummy[p] = False
+        idxs_unlabeled_forUMAP = idxs_unlabeled[dummy]
+        chosen_diversity = self.init_centers(standard_embedding[idxs_unlabeled_forUMAP], n_diversity)
+        chosen = list(set(chosen_uncertainty.tolist()).union(set(chosen_diversity)))
+        header_ = ['label', 'index']
+        df = pd.DataFrame(np.concatenate(
+            [np.expand_dims((self.Y[idxs_unlabeled[chosen]]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1)], axis=1),
+            columns=header_)
+        df.to_csv(selected_sample_name, index=False)
+
+        del standard_embedding, df
+        return idxs_unlabeled[chosen]
+
 
 class BadgePoincareSampling(Strategy):
     def __init__(self, X, Y, idxs_lb, net, handler, args):
