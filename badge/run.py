@@ -15,7 +15,7 @@ from query_strategies.util import create_directory
 from query_strategies.hyperbolic_embedding_umap_sampling import HypUmapSampling, HypNetBadgeSampling, \
     UmapPoincareKmeansSampling, UmapHyperboloidKmeansSampling, UmapHyperboloidKmeansSampling2, \
     HyperboloidKmeansSampling, PoincareKmeansSampling, HypNetNormSampling, UmapKmeansSampling, BadgePoincareSampling, \
-    PoincareKmeansSamplingNew, MEALSampling
+    PoincareKmeansSamplingNew, MEALSampling, PoincareKmeansUncertaintySampling
 from dataset import get_dataset, get_handler
 # from model import get_net
 from model import HyperNet, Net0, Net00, HyperNet2, HyperNet3, HyperResNet50
@@ -370,10 +370,10 @@ elif opts.alg == 'umap':
     strategy = UmapKmeansSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'meal':
     strategy = MEALSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
-elif opts.alg == 'PoincareKmeans':
+elif opts.alg == 'PoincareKmeans_argmax':
     strategy = PoincareKmeansSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
-elif opts.alg == 'PoincareKmeansNew':
-    strategy = PoincareKmeansSamplingNew(X_tr, Y_tr, idxs_lb, net, handler, args)
+elif opts.alg == 'PoincareKmeansUncertainty':
+    strategy = PoincareKmeansUncertaintySampling(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'BadgePoincareKmeans':
     strategy = BadgePoincareSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'HyperboloidKmeans':
