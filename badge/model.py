@@ -1,6 +1,10 @@
 import torch.nn as nn
 import torch.nn.functional as F
 import hyptorch.nn as hypnn
+import hyptorch.pmath as pmath
+from resnet import ResNet50
+
+import pdb
 
 def get_net(name):
     if name == 'MNIST':
@@ -11,6 +15,8 @@ def get_net(name):
         return Net2
     elif name == 'CIFAR10':
         return Net3
+    # elif name == 'CUB':
+    #     return ResNet50
 
 
 class HyperNet(nn.Module):
@@ -30,7 +36,9 @@ class HyperNet(nn.Module):
         self.fc1 = nn.Linear(5 * 5 * 50, 500)  #cifar10 original image size is 32x32
         self.fc2 = nn.Linear(500, self.poincare_ball_dim)
         self.tp = hypnn.ToPoincare(
-            c=c, train_x=train_x, train_c=train_c, ball_dim=self.poincare_ball_dim
+            c=c, train_x=train_x, train_c=train_c, ball_dim=self.poincare_ball_dim,
+            riemannian=False,
+            clip_r = 2.3,  # feature clipping radius
         )
         self.mlr = hypnn.HyperbolicMLR(ball_dim=self.poincare_ball_dim, n_classes=10, c=c)
         # self.mlr = hypnn.HyperbolicMLR_fix_grad(ball_dim=dim, n_classes=10, c=c)
@@ -45,12 +53,138 @@ class HyperNet(nn.Module):
         e1 = F.relu(self.fc1(x))
         e2 = self.fc2(e1)
         e2_tp = self.tp(e2)
-        # return F.log_softmax(self.mlr(e2_tp, c=self.tp.c), dim=-1), e1. ##tmux 1 is running based on this
         return self.mlr(e2_tp, c=self.tp.c), e2_tp 
+        # return self.mlr(e2_tp, c=self.tp.c), e1 
 
     def get_embedding_dim(self):
         # return 500 #if use after fc1 as embedding
         return self.poincare_ball_dim # if use after fc2 as embedding
+
+
+class HyperNet2(nn.Module):
+    def __init__(self, args):
+        ## hyperparameters
+        self.poincare_ball_dim = args['poincare_ball_dim']
+        self.c = args['poincare_ball_curvature']
+        print(f'Using c={self.c} for HyperNet')
+        train_x = False # train the exponential map origin
+        train_c = False # train the Poincare ball curvature
+
+        super(HyperNet2, self).__init__()
+        self.conv1 = nn.Conv2d(3, 20, 5, 1)
+        self.conv2 = nn.Conv2d(20, 50, 5, 1)
+        # self.hyfc1 = hypnn.HypLinear(4 * 4 * 50, 500, c=self.c)
+
+        self.hyfc1 = hypnn.HypLinear(5 * 5 * 50, 500, c=self.c)
+        self.hyfc2 = hypnn.HypLinear(500, self.poincare_ball_dim, c=self.c)
+        self.tp = hypnn.ToPoincare(
+            c=self.c, train_x=train_x, train_c=train_c, ball_dim=self.poincare_ball_dim
+        )
+        self.mlr = hypnn.HyperbolicMLR(ball_dim=self.poincare_ball_dim, n_classes=10, c=self.c)
+        # self.mlr = hypnn.HyperbolicMLR_fix_grad(ball_dim=dim, n_classes=10, c=self.c)
+
+
+    def forward(self, x):
+        x = F.relu(self.conv1(x))
+        x = F.max_pool2d(x, 2, 2)
+        x = F.relu(self.conv2(x))
+        x = F.max_pool2d(x, 2, 2)
+        # x = x.view(-1, 4 * 4 * 50)
+        x = x.view(-1, 5 * 5 * 50)
+        e1 = F.relu(self.hyfc1(x))
+        e2 = self.hyfc2(e1)
+        e2_tp = self.tp(e2)
+        # return F.log_softmax(self.mlr(e2_tp, c=self.tp.c), dim=-1), e1
+        return self.mlr(e2_tp, c=self.tp.c), e2_tp 
+        
+        # logits1 = self.mlr(e2_tp, c=self.tp.c)
+        # proto = pmath.poincare_mean(e2_tp, dim=0, c=self.c)
+        # temperature = 1        
+        # # e2_tp = e2_tp.view(-1, )
+        # logits2 = (
+        #         -pmath.dist_matrix(e2_tp, proto, c=self.c) / temperature
+        #     )
+        # print(logits1, logits2)
+        # pdb.set_trace()
+
+
+    def get_embedding_dim(self):
+        return self.poincare_ball_dim # if use after fc2 as embedding
+
+
+
+class HyperNet3(nn.Module):
+    # https://github.com/leymir/hyperbolic-image-embeddings/blob/master/examples/mnist.py
+    def __init__(self, args):
+        ## hyperparameters
+        self.poincare_ball_dim = args['poincare_ball_dim'] #"Dimension of the Poincare ball"
+        c = args['poincare_ball_curvature'] #1.0 #"Curvature of the Poincare ball"
+        print(f'Using c={c} for HyperNet')
+        train_x = False # train the exponential map origin
+        train_c = False # train the Poincare ball curvature
+
+        super(HyperNet3, self).__init__()
+        self.conv1 = nn.Conv2d(3, 20, 5, 1)
+        self.conv2 = nn.Conv2d(20, 50, 5, 1)
+        # self.fc1 = nn.Linear(4 * 4 * 50, 500)
+        self.fc1 = nn.Linear(5 * 5 * 50, 500)  #cifar10 original image size is 32x32
+        self.fc2 = nn.Linear(500, 100)
+        self.fc3 = nn.Linear(100, self.poincare_ball_dim)
+        self.tp = hypnn.ToPoincare(
+            c=c, train_x=train_x, train_c=train_c, ball_dim=self.poincare_ball_dim
+        )
+        self.mlr = hypnn.HyperbolicMLR(ball_dim=self.poincare_ball_dim, n_classes=10, c=c)
+        # self.mlr = hypnn.HyperbolicMLR_fix_grad(ball_dim=dim, n_classes=10, c=c)
+
+    def forward(self, x):
+        x = F.relu(self.conv1(x))
+        x = F.max_pool2d(x, 2, 2)
+        x = F.relu(self.conv2(x))
+        x = F.max_pool2d(x, 2, 2)
+        # x = x.view(-1, 4 * 4 * 50)
+        x = x.view(-1, 5 * 5 * 50)
+        e1 = F.relu(self.fc1(x))
+        e2 = F.relu(self.fc2(e1))
+        e3 = self.fc3(e2)
+        e3_tp = self.tp(e3)
+        return self.mlr(e3_tp, c=self.tp.c), e3_tp 
+
+    def get_embedding_dim(self):
+        return self.poincare_ball_dim # if use after fc2 as embedding
+
+
+class HyperResNet50(nn.Module):
+    # https://github.com/leymir/hyperbolic-image-embeddings/blob/master/examples/mnist.py
+    def __init__(self, args):
+        super(HyperResNet50, self).__init__()
+        ## hyperparameters
+        self.poincare_ball_dim = args['poincare_ball_dim'] #"Dimension of the Poincare ball"
+        c = args['poincare_ball_curvature'] #1.0 #"Curvature of the Poincare ball"
+        print(f'Using c={c} for HyperResNet50')
+        train_x = False # train the exponential map origin
+        train_c = False # train the Poincare ball curvature
+        
+        self.n_classes = 200 #CUB
+        self.resnet50 = ResNet50(self.n_classes)
+        self.resnet_out_dim = 2048 #512*3*3 
+        self.fc1 = nn.Linear(self.resnet_out_dim, self.poincare_ball_dim)
+        self.tp = hypnn.ToPoincare(
+            c=c, train_x=train_x, train_c=train_c, ball_dim=self.poincare_ball_dim
+        )
+        self.mlr = hypnn.HyperbolicMLR(ball_dim=self.poincare_ball_dim, n_classes=self.n_classes, c=c)
+        # self.mlr = hypnn.HyperbolicMLR_fix_grad(ball_dim=dim, n_classes=self.n_classes, c=c)
+
+    def forward(self, x):
+        _, x = self.resnet50(x)
+        x = x.view(-1, self.resnet_out_dim)
+        e1 = F.relu(self.fc1(x))
+        e1_tp = self.tp(e1)
+        return self.mlr(e1_tp, c=self.tp.c), e1 
+
+    def get_embedding_dim(self):
+        return self.poincare_ball_dim
+
+
 
 
 class Net0(nn.Module):

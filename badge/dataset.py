@@ -1,3 +1,5 @@
+from __future__ import print_function
+from __future__ import division
 import numpy as np
 import pdb
 import torch
@@ -7,9 +9,9 @@ from PIL import Image
 from torchvision import transforms
 
 from cub200_dataset import Cub200
+import pdb
 
-
-def get_dataset(name, path):
+def get_dataset(name, path, args):
     if name == 'MNIST':
         return get_MNIST(path)
     elif name == 'FashionMNIST':
@@ -19,7 +21,7 @@ def get_dataset(name, path):
     elif name == 'CIFAR10':
         return get_CIFAR10(path)
     elif name == 'CUB':
-        return get_CUB(path)
+        return get_CUB(path, args)
 
 def get_MNIST(path):
     raw_tr = datasets.MNIST(path + '/MNIST', train=True, download=True)
@@ -57,8 +59,8 @@ def get_CIFAR10(path):
     Y_te = torch.from_numpy(np.array(data_te.targets))
     return X_tr, Y_tr, X_te, Y_te
 
-def get_CUB(path):
-    dataset = Cub200(root='./data')
+def get_CUB(path, args):
+    dataset = Cub200('./data', args)
     X_tr, Y_tr, X_te, Y_te = dataset.get_train_test_data()
     X_tr = np.array(X_tr,dtype=np.float32)
     X_te = np.array(X_te,dtype=np.float32)
@@ -124,6 +126,7 @@ class DataHandler3(Dataset):
 
     def __getitem__(self, index):
         x, y = self.X[index], self.Y[index]
+        # print('MNIST self.transform:', self.transform)
         if self.transform is not None:
             x = Image.fromarray(x)
             x = self.transform(x)
@@ -144,3 +147,84 @@ class DataHandler4(Dataset):
 
     def __len__(self):
         return len(self.X)
+
+
+
+
+
+### add data handler for CUB in order to use class-based sampler
+
+
+
+import os
+import torch
+import torchvision
+import numpy as np
+import PIL.Image
+
+# https://github.com/htdt/hyp_metric/blob/c89de0490691bacbd7332171c5455651fe49f25e/proxy_anchor/dataset/base.py
+class BaseDataset(torch.utils.data.Dataset):
+    def __init__(self, root, mode, transform = None):
+        self.root = root
+        self.mode = mode
+        self.transform = transform
+        self.ys, self.im_paths, self.I = [], [], []
+
+    def nb_classes(self):
+        assert set(self.ys) == set(self.classes)
+        return len(self.classes)
+
+    def __len__(self):
+        return len(self.ys)
+
+    def __getitem__(self, index):
+        def img_load(index):
+            im = PIL.Image.open(self.im_paths[index])
+            # convert gray to rgb
+            if len(list(im.split())) == 1 : im = im.convert('RGB') 
+            if self.transform is not None:
+                im = self.transform(im)
+            return im
+
+        im = img_load(index)
+        target = self.ys[index]
+
+        return im, target
+
+    def get_label(self, index):
+        return self.ys[index]
+
+    def set_subset(self, I):
+        self.ys = [self.ys[i] for i in I]
+        self.I = [self.I[i] for i in I]
+        self.im_paths = [self.im_paths[i] for i in I]
+
+# https://github.com/htdt/hyp_metric/blob/c89de0490691bacbd7332171c5455651fe49f25e/proxy_anchor/dataset/cub.py
+class CUBirds(BaseDataset):
+    def __init__(self, root, mode, transform = None):
+        self.root = root + '/CUB_200_2011'
+        self.mode = mode
+        self.transform = transform
+        if self.mode == 'train':
+            self.classes = range(0,100)
+        elif self.mode == 'eval':
+            self.classes = range(100,200)
+        
+        BaseDataset.__init__(self, self.root, self.mode, self.transform)
+        index = 0
+        for i in torchvision.datasets.ImageFolder(root = 
+                os.path.join(self.root, 'images')).imgs:
+            # i[1]: label, i[0]: root
+            y = i[1]
+            # fn needed for removing non-images starting with `._`
+            fn = os.path.split(i[0])[1]
+            if y in self.classes and fn[:2] != '._':
+                self.ys += [y]
+                self.I += [index]
+                self.im_paths.append(os.path.join(self.root, i[0]))
+                index += 1
+
+
+
+
+

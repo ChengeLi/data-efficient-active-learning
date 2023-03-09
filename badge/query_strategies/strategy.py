@@ -14,6 +14,9 @@ from torch.distributions.categorical import Categorical
 import os
 import pandas as pd
 from matplotlib import pyplot as plt
+import hyptorch.pmath as pmath
+from hyptorch.loss import contrastive_loss
+import umap
 
 class Strategy:
     def __init__(self, X, Y, idxs_lb, net, handler, args):
@@ -54,24 +57,6 @@ class Strategy:
         return accFinal / len(loader_tr.dataset.X), loss.item()
 
 
-    def _hyper_train(self, epoch, loader_tr, optimizer):
-        self.clf.train()
-        accFinal = 0.
-        for batch_idx, (x, y, idxs) in enumerate(loader_tr):
-            x, y = Variable(x.cuda()), Variable(y.cuda())
-            optimizer.zero_grad()
-            out, _ = self.clf(x)
-            out = F.log_softmax(out, dim=-1)
-            loss = F.nll_loss(out, y)
-            accFinal += torch.sum((torch.max(out,1)[1] == y).float()).data.item()
-            loss.backward()
-
-            # clamp gradients, just in case
-            for p in filter(lambda p: p.grad is not None, self.clf.parameters()): p.grad.data.clamp_(min=-.1, max=.1)
-            optimizer.step()
-
-        return accFinal / len(loader_tr.dataset.X), loss.item()
-
  
     def train(self, reset=True, optimizer=0, verbose=True, data=[], net=[], model_selection=None):
         def weight_reset(m):
@@ -98,9 +83,6 @@ class Strategy:
             if not isinstance(self.clf, nn.DataParallel):
                 print('enabling multiple gpus')
                 self.clf = self.enable_multiple_gpu_model(self.clf)
-            # if model_selection == 'HyperNet':
-            #     accCurrent, lossCurrent = self._hyper_train(epoch, loader_tr, optimizer)
-            # else:
             accCurrent, lossCurrent = self._train(epoch, loader_tr, optimizer)
             if bestAcc < accCurrent:
                 bestAcc = accCurrent
@@ -414,7 +396,8 @@ class Strategy:
         return torch.Tensor(embedding)
 
 
-    def get_grad_embedding_for_hyperNet(self, X, Y, model=[], fix_grad=False, RiemannianGradient_c=1, get_raw_embedding=False):
+    def get_grad_embedding_for_hyperNet(self, X, Y, model=[], fix_grad=False, RiemannianGradient_c=1, 
+                                         get_raw_embedding=False, back_to_euclidean=False):
 
         def get_riemannian_gradient(x):
             scale = (1 - (RiemannianGradient_c * x**2).sum(-1))**2 / 4
@@ -429,7 +412,7 @@ class Strategy:
             embDim = model.get_embedding_dim()
         model.eval()
         nLab = len(np.unique(Y))
-        embedding = np.zeros([len(Y), embDim * nLab])
+        grad_embedding = np.zeros([len(Y), embDim * nLab])
         if get_raw_embedding:
             raw_embedding = np.zeros([len(Y), embDim])
 
@@ -439,39 +422,33 @@ class Strategy:
             for x, y, idxs in loader_te:
                 x, y = Variable(x.cuda()), Variable(y.cuda())
                 cout, out = model(x) #mlr is after hyperbolic softmax
+
+                ## project back to euclidean space
+                if back_to_euclidean:
+                    out = pmath.logmap0(out, c=self.curvature)
+
                 out = out.data.cpu().numpy()
                 batchProbs = F.softmax(cout, dim=1).data.cpu().numpy()
                 maxInds = np.argmax(batchProbs,1)
-                if np.inf in out:
-                    pdb.set_trace()
-                if np.inf in batchProbs:
-                    pdb.set_trace()
                 for j in range(len(y)):
                     for c in range(nLab):
                         if c == maxInds[j]:
-                            if np.inf in deepcopy(out[j]) * (1 - batchProbs[j][c]):
-                                pdb.set_trace()
-                            embedding[idxs[j]][embDim * c : embDim * (c+1)] = deepcopy(out[j]) * (1 - batchProbs[j][c])
+                            grad_embedding[idxs[j]][embDim * c : embDim * (c+1)] = deepcopy(out[j]) * (1 - batchProbs[j][c])
                         else:
-                            if np.inf in deepcopy(out[j]) * (-1 * batchProbs[j][c]):
-                                pdb.set_trace()
-                            embedding[idxs[j]][embDim * c : embDim * (c+1)] = deepcopy(out[j]) * (-1 * batchProbs[j][c])
+                            grad_embedding[idxs[j]][embDim * c : embDim * (c+1)] = deepcopy(out[j]) * (-1 * batchProbs[j][c])
 
                     if get_raw_embedding:
                         raw_embedding[idxs[j]] = deepcopy(out[j])
                 if fix_grad:
-                    print('fix gradient to be RiemannianGradient')
-                    for ii in range(len(embedding)):
-                        for jj in range(embedding.shape[1]):
-                            embedding[ii,jj] = get_riemannian_gradient(embedding[ii,jj])
-
-            if np.inf in embedding:
-                pdb.set_trace()
+                    # print('fix gradient to be RiemannianGradient')
+                    for ii in range(len(grad_embedding)):
+                        for jj in range(grad_embedding.shape[1]):
+                            grad_embedding[ii,jj] = get_riemannian_gradient(grad_embedding[ii,jj])
 
             if get_raw_embedding:
-                return embedding, raw_embedding
+                return grad_embedding, raw_embedding
             else:
-                return embedding, None
+                return grad_embedding, None
 
     def get_grad_embedding_hyperbolic_feature(self, X, Y, model=[]):
         """
@@ -539,39 +516,80 @@ class Strategy:
                     embedding[idxs[j]] = deepcopy(out[j])
             return torch.Tensor(embedding)
 
-    def save_images_and_embeddings(self, embedding, idxs_unlabeled, chosen):
+    def save_images_and_embeddings(self, embedding, idxs_unlabeled, chosen, iteration_ind):
         ### add visualization, save embedding
         if len(os.listdir(self.output_sample_dir)) != 0:
-            name = int(sorted(os.listdir(self.output_sample_dir))[-1][4:-4]) + 1
+            # name = int(sorted(os.listdir(self.output_sample_dir))[-1][4:-4]) + 1
+            name = iteration_ind
             image_name = os.path.join(self.output_image_dir, "{:05d}.png".format(name))
             selected_sample_name = os.path.join(self.output_sample_dir, "chosen_{:05d}.csv".format(name))
             all_emb_name = os.path.join(self.output_sample_dir, "emb_{:05d}.npy".format(name))
             del name
         else:
-
             image_name = os.path.join(self.output_image_dir, '00000.png')
             selected_sample_name = os.path.join(self.output_sample_dir, 'chosen_00000.csv')
             all_emb_name = os.path.join(self.output_sample_dir, "emb_00000.npy")
 
         np.save(all_emb_name, np.concatenate([np.expand_dims(self.Y, axis=1), embedding], axis=1))
-
         header_ = ['label', 'index']
         df = pd.DataFrame(np.concatenate(
             [np.expand_dims((self.Y[idxs_unlabeled[chosen]]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1)], axis=1),
             columns=header_)
         df.to_csv(selected_sample_name, index=False)
 
-        plt.scatter(embedding.T[0],
-                    embedding.T[1],
-                    c=self.Y, s=2, cmap='Spectral')
+        ### umap projection
+        original_emb_in_euclidean = False
+        if embedding.shape[1]>2:
+            print('projecting using umap')
+            if original_emb_in_euclidean:
+                pass
+            else:
+                #project back to euclidean
+                from manifolds import PoincareBall
+                print('projecting back to euclidean')
+                manifold = PoincareBall()
+                embedding = manifold.logmap0(torch.tensor(embedding), c=1/15).numpy()
+            embedding = umap.UMAP(output_metric='hyperboloid', random_state=42, tqdm_kwds={'disable': False}).fit_transform(embedding)
+
 
         chosen_emb = embedding[idxs_unlabeled[chosen]]
-        plt.scatter(chosen_emb.T[0],
-                    chosen_emb.T[1],
-                    c=self.Y[idxs_unlabeled[chosen]],
-                    edgecolor='black', linewidth=0.3, marker='*', cmap='Spectral')
-        plt.xlim([-1, 1])
-        plt.ylim([-1, 1])
+
+        def convert_hyperbolid_to_poincare_disk(embedding):
+            x = embedding.T[0]
+            y = embedding.T[1]
+            z = np.sqrt(1 + np.sum(embedding**2, axis=1))
+
+            # fig = plt.figure()
+            # ax = fig.add_subplot(111, projection='3d')
+            # ax.scatter(x, y, z, c=labels, cmap='Spectral')
+            # ax.view_init(35, 80)
+            disk_x = x / (1 + z)
+            disk_y = y / (1 + z)
+            return disk_x, disk_y
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        def plot_poincare_disk(ax, disk_x, disk_y, target, radius=1, plot_selected=False):
+            if plot_selected:
+                ax.scatter(disk_x, disk_y, c=target, edgecolor='black', 
+                    linewidth=0.5, marker='o', cmap='Spectral') 
+            else:
+                ax.scatter(disk_x, disk_y, c=target, s=2, cmap='Spectral')
+
+            boundary = plt.Circle((0,0), radius, fc='none', ec='k')
+            ax.add_artist(boundary)
+            ax.axis('off');
+
+        disk_x, disk_y = convert_hyperbolid_to_poincare_disk(embedding)
+        plot_poincare_disk(ax, disk_x, disk_y, self.Y, radius=1)
+        disk_x_chosen, disk_y_chosen = convert_hyperbolid_to_poincare_disk(chosen_emb)
+        plot_poincare_disk(ax, disk_x_chosen, disk_y_chosen, self.Y[idxs_unlabeled[chosen]], radius=1, plot_selected=True)
+        # plt.xlim([-1, 1])
+        # plt.ylim([-1, 1])
         plt.savefig(image_name)
         plt.close('all')
         del embedding
+
+
+
+

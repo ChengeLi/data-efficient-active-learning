@@ -15,10 +15,11 @@ from query_strategies.util import create_directory
 from query_strategies.hyperbolic_embedding_umap_sampling import HypUmapSampling, HypNetBadgeSampling, \
     UmapPoincareKmeansSampling, UmapHyperboloidKmeansSampling, UmapHyperboloidKmeansSampling2, \
     HyperboloidKmeansSampling, PoincareKmeansSampling, HypNetNormSampling, UmapKmeansSampling, BadgePoincareSampling, \
-    PoincareKmeansSamplingNew
+    PoincareKmeansSamplingNew, HyperNorm_plus_RiemannianBadge_Sampling,\
+    HypNetBadgePoincareKmeansSampling, HypNetEmbeddingPoincareKmeansSampling
 from dataset import get_dataset, get_handler
 # from model import get_net
-from model import HyperNet, Net0, Net00
+from model import HyperNet, Net0, Net00, HyperNet2, HyperNet3, HyperResNet50
 import vgg
 import resnet
 from sklearn.preprocessing import LabelEncoder
@@ -26,7 +27,7 @@ import torch.nn.functional as F
 from torch import nn
 from torchvision import transforms
 import torch
-import random
+import random, PIL
 # import time
 import pdb
 # from scipy.stats import zscore
@@ -102,32 +103,48 @@ args_pool = {'MNIST':
                       transforms.ToTensor(),
                       transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
                   ]),
-                  'loader_tr_args': {'batch_size': 128, 'num_workers': 1},
-                  'loader_te_args': {'batch_size': 1000, 'num_workers': 1},
+                  'loader_tr_args': {'batch_size': 128, 'num_workers': 0},
+                  'loader_te_args': {'batch_size': 1000, 'num_workers': 0},
                   'optimizer_args': {'lr': 0.05, 'momentum': 0.3},
                   'transformTest': transforms.Compose([transforms.ToTensor(),
                                                        transforms.Normalize((0.4914, 0.4822, 0.4465),
                                                                             (0.2470, 0.2435, 0.2616))])},
-             'CUB':
+            #  'CUB':
+            #      {'n_epoch': 3,
+            #       'max_epoch': 300,
+            #       'transform': transforms.Compose(
+            #     [
+            #         transforms.RandomResizedCrop(84),
+            #         ImageJitter(dict(Brightness=0.4, Contrast=0.4, Color=0.4)),
+            #         transforms.RandomHorizontalFlip(),
+            #         transforms.ToTensor(),
+            #         transforms.Normalize(
+            #             np.array([0.485, 0.456, 0.406]), np.array([0.229, 0.224, 0.225])
+            #         ),
+            #     ]
+            # ),
+            #       'loader_tr_args': {'batch_size': 64, 'num_workers': 1},
+            #       'loader_te_args': {'batch_size': 1000, 'num_workers': 1},
+            #       'optimizer_args': {'lr': 0.01, 'momentum': 0.3},
+            #       'transformTest': transforms.Compose([transforms.ToTensor(),
+            #                                            transforms.Normalize((0.4914, 0.4822, 0.4465),
+            #                                                                 (0.2470, 0.2435, 0.2616))])},
+            'CUB':
                  {'n_epoch': 3,
-                  'max_epoch': 300,
-                  'transform': transforms.Compose(
-                [
-                    transforms.RandomResizedCrop(84),
-                    ImageJitter(dict(Brightness=0.4, Contrast=0.4, Color=0.4)),
-                    transforms.RandomHorizontalFlip(),
-                    transforms.ToTensor(),
-                    transforms.Normalize(
-                        np.array([0.485, 0.456, 0.406]), np.array([0.229, 0.224, 0.225])
-                    ),
-                ]
-            ),
-                  'loader_tr_args': {'batch_size': 64, 'num_workers': 1},
-                  'loader_te_args': {'batch_size': 1000, 'num_workers': 1},
-                  'optimizer_args': {'lr': 0.01, 'momentum': 0.3},
+                  'max_epoch': 100,
+                  'transform': transforms.Compose([
+                     transforms.RandomResizedCrop(224, scale=(0.2, 1.0), interpolation=PIL.Image.BICUBIC),
+                     transforms.RandomHorizontalFlip(),
+                     transforms.ToTensor(),
+                     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
+                 ]),
+                  'size': (224,224),
+                  'loader_tr_args': {'batch_size': 64, 'num_workers': 0},
+                  'loader_te_args': {'batch_size': 1000, 'num_workers': 0},
+                  'optimizer_args': {'lr': 0.05, 'momentum': 0.3},
                   'transformTest': transforms.Compose([transforms.ToTensor(),
                                                        transforms.Normalize((0.4914, 0.4822, 0.4465),
-                                                                            (0.2470, 0.2435, 0.2616))])}
+                                                                            (0.2470, 0.2435, 0.2616))])},
              }
 if DATA_NAME in ['MNIST', 'CIFAR10']:
     opts.nClasses = 10
@@ -191,10 +208,16 @@ if opts.did > 0:
             'optimizer_args': {'lr': 0.01, 'momentum': 0},
             'transformTest': transforms.Compose([transforms.ToTensor()])}
     handler = get_handler('other')
+# elif DATA_NAME=='CUB' and opts.model=='HyperNet':
+#     pass
 
 # load non-openml dataset
 else:
-    X_tr, Y_tr, X_te, Y_te = get_dataset(DATA_NAME, opts.path)
+    if DATA_NAME=='CUB':
+      cub_root = '/workplace/ICCV_AL/data-efficient-active-learning/badge/data/CUB_200_2011/224/'
+      X_tr, Y_tr, X_te, Y_te = torch.tensor(np.load(cub_root+'X_tr.npy')), torch.tensor(np.load(cub_root+'Y_tr.npy')), torch.tensor(np.load(cub_root+'X_te.npy')), torch.tensor(np.load(cub_root+'Y_te.npy'))
+    else:
+      X_tr, Y_tr, X_te, Y_te = get_dataset(DATA_NAME, opts.path, args_pool[DATA_NAME])
     opts.dim = np.shape(X_tr)[1:]
     handler = get_handler(opts.data)
 
@@ -208,7 +231,7 @@ if opts.trunc != -1:
     opts.nClasses = int(max(Y_tr) + 1)
 
 args['poincare_ball_curvature'] = 1/15
-args['poincare_ball_dim'] = 2
+args['poincare_ball_dim'] = 20
 args['lr'] = opts.lr
 args['modelType'] = opts.model
 args['lamb'] = opts.lamb
@@ -273,12 +296,14 @@ class mlpMod(nn.Module):
 
 if opts.model == 'net00':
     EXPERIMENT_NAME = DATA_NAME + '_' + opts.model +'_embDim20_curvature-03' + '_' + opts.alg + '_' + str(NUM_QUERY)
-elif opts.model == 'HyperNet':
+elif 'HyperNet' in opts.model:
     EXPERIMENT_NAME = DATA_NAME + '_' + opts.model + opts.alg + '_' + str(NUM_QUERY) \
                     +'_balldim{}_c{}'.format(args['poincare_ball_dim'], args['poincare_ball_curvature']) \
-                    +'_normalized'
+                    +'clipr' # + '_newlossonly_batchsize250'
 else:
     EXPERIMENT_NAME = DATA_NAME + '_' + opts.model + '_dim20' + opts.alg + '_' + str(NUM_QUERY)
+
+print('EXPERIMENT_NAME={}'.format(EXPERIMENT_NAME))
 
 args['output_dir'] = os.path.join('./badge/output', EXPERIMENT_NAME)
 create_directory(args['output_dir'])
@@ -287,6 +312,8 @@ if opts.model == 'mlp':
     net = mlpMod(opts.dim, embSize=opts.nEmb)
 elif opts.model == 'resnet':
     net = resnet.ResNet18(num_classes=opts.nClasses)
+elif opts.model == 'resnet50':
+    net = resnet.ResNet50(num_classes=opts.nClasses)
 elif opts.model == 'vgg':
     net = vgg.VGG('VGG16')
 elif opts.model == 'lin':
@@ -300,6 +327,14 @@ elif opts.model == 'swin_t':
 elif opts.model == 'HyperNet':
     print('Using hypernet')
     net = HyperNet(args)
+    if DATA_NAME=='CUB':
+        net = HyperResNet50(args)
+elif opts.model == 'HyperNet2':
+    print('Using hypernet2')
+    net = HyperNet2(args)
+elif opts.model == 'HyperNet3':
+    print('Using hypernet3')
+    net = HyperNet3(args)
 elif opts.model == 'net0':
     print('Using Net0')
     net = Net0()
@@ -352,6 +387,8 @@ elif opts.alg == 'hypNetBadgePoinKmeans':
     strategy = HypNetBadgePoincareKmeansSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'hypNetNorm':
     strategy = HypNetNormSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
+elif opts.alg == 'hyperEmbPoincareKmeans':
+    strategy = HypNetEmbeddingPoincareKmeansSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'hyperNorm_plus_Rbadge':
     strategy = HyperNorm_plus_RiemannianBadge_Sampling(X_tr, Y_tr, idxs_lb, net, handler, args)
 # elif opts.alg == 'HypNetNormPoinKmeans':
@@ -378,7 +415,7 @@ print(type(strategy).__name__, flush=True)
 if type(X_te) == torch.Tensor: X_te = X_te.numpy()
 results = []
 # round 0 accuracy
-strategy.train(verbose=False,model_selection=opts.model)
+strategy.train(verbose=False, model_selection=opts.model)
 P = strategy.predict(X_te, Y_te)
 acc = np.zeros(NUM_ROUND + 1)
 acc[0] = 1.0 * (Y_te == P).sum().item() / len(Y_te)

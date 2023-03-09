@@ -10,6 +10,7 @@ from torchvision.datasets.utils import download_url
 from torch.utils.data import Dataset
 from PIL import ImageEnhance
 from scipy import io, misc
+import pdb
 # import requests
 
 # def download_file_from_google_drive(id, destination):
@@ -81,7 +82,8 @@ class Cub200(Dataset):
     # tgz_md5 = '97eceeb196236b17998738112f37df78'
     # gdrive_id = 'hbzc_P1FuxMkcabkgn9ZKinBwW683j45'
 
-    def __init__(self, root, train=True, transform=None, crop=1.2, target_size=(32, 32)):
+    # def __init__(self, root, train=True, transform=None, crop=1.2, target_size=(32, 32)):
+    def __init__(self, root, args):
         """
             Load the dataset.
             Input:
@@ -101,22 +103,22 @@ class Cub200(Dataset):
                 target_size: if provided, all images are resized to the size
                     specified. Should be a list of two integers, like [640,480].
         """
+
         self.root = os.path.expanduser(root)
         self.image_path = os.path.join(self.root, self.base_folder)
-        self.transform = transform
+        self.transform = args['transform']
         self.loader = default_loader
-        self.train = train
-        self.target_size = target_size
+        self.train = True
+        self.target_size = args['size']
         images = pd.read_csv(os.path.join(self.root, 'CUB_200_2011', 'images.txt'), sep=' ',
                              names=['img_id', 'filepath'])
         image_class_labels = pd.read_csv(os.path.join(self.root, 'CUB_200_2011', 'image_class_labels.txt'),
                                          sep=' ', names=['img_id', 'target'])
         train_test_split = pd.read_csv(os.path.join(self.root, 'CUB_200_2011', 'train_test_split.txt'),
                                        sep=' ', names=['img_id', 'is_training_img'])
-
         data = images.merge(image_class_labels, on='img_id')
         self._data = data.merge(train_test_split, on='img_id')
-        self._crop = crop
+        self._crop = False
         self.data_train = self._data[self._data.is_training_img == 1]
         self.data_test = self._data[self._data.is_training_img == 0]
         self._boxes = [line.split()[1:] for line in
@@ -222,7 +224,7 @@ class Cub200(Dataset):
         path = os.path.join(self.root, self.base_folder, sample.filepath)
         target = sample.target - 1  # Targets start at 1 by default, so shift to 0
         img = self.loader(path)
-
+        print('CUB self.transform ', self.transform)
         if self.transform is not None:
             img = self.transform(img)
 

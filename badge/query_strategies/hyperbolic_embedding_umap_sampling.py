@@ -9,6 +9,7 @@ patch_sklearn()
 import pandas as pd
 import scipy
 import torch
+from torch import nn
 from matplotlib import pyplot as plt
 from scipy import stats
 from sklearn.metrics import pairwise_distances, adjusted_rand_score, adjusted_mutual_info_score
@@ -19,6 +20,20 @@ import umap.plot
 from manifolds import Hyperboloid, PoincareBall
 from .util import create_directory, plot_clusters_no_edge
 import pdb
+import torch.nn.functional as F
+import torch.optim as optim
+from torch.utils.data import DataLoader
+from copy import deepcopy
+from tqdm import tqdm
+import hyptorch.pmath as pmath
+from hyptorch.loss import contrastive_loss
+# from apex import amp
+
+import multiprocessing
+from hyptorch.sampler import UniqueClassSempler
+from torch.autograd import Variable
+# from dataset import CUBirds
+
 
 PROJ_EPS = 1e-3
 EPS = 1e-15
@@ -511,8 +526,7 @@ class UmapPoincareKmeansSampling(Strategy):
             cent += 1
         return indsAll
 
-   def query(self, n):
-
+    def query(self, n):
         if len(os.listdir(self.output_image_dir)) != 0:
             name = int(sorted(os.listdir(self.output_image_dir))[-1][:-4]) + 1
             image_name = os.path.join(self.output_image_dir, "{:05d}.png".format(name))
@@ -928,6 +942,7 @@ class HypNetBadgeSampling(Strategy):
     def __init__(self, X, Y, idxs_lb, net, handler, args):
         super(HypNetBadgeSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
         self.curvature = args['poincare_ball_curvature']
+        self.radius = 1
 
         self.manifold = PoincareBall()
         self.output_dir = args['output_dir']
@@ -935,6 +950,7 @@ class HypNetBadgeSampling(Strategy):
         self.output_sample_dir = os.path.join(self.output_dir, 'samples')
         create_directory(self.output_image_dir)
         create_directory(self.output_sample_dir)
+        self.iteration_ind = 0
 
     def init_centers(self, X, K):
         ind = np.argmax([np.linalg.norm(s, 2) for s in X])  # this only make sense for badge
@@ -967,23 +983,27 @@ class HypNetBadgeSampling(Strategy):
             cent += 1
         return indsAll
 
+
     def query(self, n):
         """
             option 1: use regular gradient in badge
             option 2: fix grad using riemannian gradient in badge
             
         """
-        use_Riemannian_grad_badge = True
+        use_Riemannian_grad_badge = False
 
         idxs_unlabeled = np.arange(self.n_pool)[~self.idxs_lb]
         gradEmbedding, embedding = self.get_grad_embedding_for_hyperNet(self.X, self.Y, 
                                                              fix_grad=use_Riemannian_grad_badge,
                                                              RiemannianGradient_c=self.curvature,
-                                                             get_raw_embedding=True)
+                                                             get_raw_embedding=True,
+                                                             back_to_euclidean=True)
         chosen = self.init_centers(gradEmbedding[idxs_unlabeled], n)
         ## normalizae embedding
-        embedding = (embedding / max(self.manifold.norm(torch.tensor(embedding))))
-        self.save_images_and_embeddings(embedding, idxs_unlabeled, chosen)
+        # embedding = (embedding / max(self.manifold.norm(torch.tensor(embedding), self.curvature)))
+        embedding = embedding / max([np.linalg.norm(s, 2) for s in embedding])
+        self.save_images_and_embeddings(embedding, idxs_unlabeled, chosen, self.iteration_ind)
+        self.iteration_ind += 1
         return idxs_unlabeled[chosen]
 
 
@@ -1001,47 +1021,157 @@ class HypNetNormSampling(Strategy):
         self.output_sample_dir = os.path.join(self.output_dir, 'samples')
         create_directory(self.output_image_dir)
         create_directory(self.output_sample_dir)
+        self.curvature = args['poincare_ball_curvature']
+        self.iteration_ind = 0
 
     def init_centers(self, X, K):
-        hyper_emb_norm = [np.linalg.norm(s, 2) for s in X]
+        # hyper_emb_norm = [np.linalg.norm(s, 2) for s in X]
+        hyper_emb_norm = [self.manifold.norm(torch.tensor(s), self.curvature) for s in X]
         indsAll = np.argsort(hyper_emb_norm, axis=0)[:K]  # select the smallest K samples
         return indsAll
 
-    def init_centers(self,X, K):
-        ind = np.argmax([np.linalg.norm(s, 2) for s in X])  # this only make sense for badge
-        mu = [X[ind]]
-        indsAll = [ind]
-        centInds = [0.] * len(X)
-        cent = 0
-        # print('#Samps\tTotal Distance')
-        while len(mu) < K:
-            if len(mu) == 1:
-                D2 = pairwise_distances(X, mu).ravel().astype(float)
-            else:
-                newD = pairwise_distances(X, [mu[-1]]).ravel().astype(float)
-                for i in range(len(X)):
-                    if D2[i] > newD[i]:
-                        centInds[i] = cent
-                        D2[i] = newD[i]
-            # print(str(len(mu)) + '\t' + str(sum(D2)), flush=True)
-            if sum(D2) == 0.0: pdb.set_trace()
-            D2 = D2.ravel().astype(float)
-            Ddist = (D2 ** 2) / sum(D2 ** 2)
-            customDist = stats.rv_discrete(name='custm', values=(np.arange(len(D2)), Ddist))
-            ind = customDist.rvs(size=1)[0]
-            while ind in indsAll: ind = customDist.rvs(size=1)[0]
-            mu.append(X[ind])
-            indsAll.append(ind)
-            cent += 1
-        return indsAll
     def query(self, n):
         idxs_unlabeled = np.arange(self.n_pool)[~self.idxs_lb]
         embedding = self.get_hyperbolic_embedding(self.X, self.Y).numpy()
-        embedding = (embedding / max(self.manifold.norm(torch.tensor(embedding))))
-        ## normalizae embedding
         chosen = self.init_centers(embedding[idxs_unlabeled], n)
-        self.save_images_and_embeddings(embedding, idxs_unlabeled, chosen)
+
+        ## normalizae embedding
+        # embedding = (embedding / max(self.manifold.norm(torch.tensor(embedding), self.curvature)))
+        # embedding = embedding / max([np.linalg.norm(s, 2) for s in embedding])
+        self.save_images_and_embeddings(embedding, idxs_unlabeled, chosen, self.iteration_ind)
+        self.iteration_ind += 1
         return idxs_unlabeled[chosen]
+
+
+    # def train(self, reset=True, optimizer=0, verbose=True, data=[], net=[], model_selection=None):
+    #     ## override the train function
+    #     def weight_reset(m):
+    #         newLayer = deepcopy(m)
+    #         if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
+    #             m.reset_parameters()
+    #     n_epoch = self.args['n_epoch']
+    #     if reset: self.clf =  self.net.apply(weight_reset).cuda()
+    #     if type(net) != list: self.clf = net
+    #     if type(optimizer) == int: optimizer = optim.Adam(self.clf.parameters(), lr = self.args['lr'], weight_decay=0)
+
+    #     idxs_train = np.arange(self.n_pool)[self.idxs_lb]
+    #     # loader_tr = DataLoader(self.handler(self.X[idxs_train], torch.Tensor(self.Y.numpy()[idxs_train]).long(), transform=self.args['transform']), shuffle=True, **self.args['loader_tr_args'])
+
+    #     # data_root = '/workplace/ICCV_AL/data/' #images/
+    #     # ds_train = CUBirds(data_root, "train", transform=self.args['transform'])
+
+    #     ## configs
+    #     # for mnist:
+    #     num_classes = 10
+    #     num_samples = self.args['loader_tr_args']['batch_size']//num_classes #2 # how many samples per each category in batch
+    #     self.args['loader_tr_args']['batch_size'] = num_samples*num_classes
+    #     print('changing batch_size to ', self.args['loader_tr_args']['batch_size'])
+    #     ## for CUB
+    #     # num_samples = 2
+
+    #     t = 0.2  # cross-entropy temperature
+    #     emb = self.args['poincare_ball_dim']#128  # output embedding size
+    #     local_rank = 0  # set automatically for distributed training
+    #     world_size = int(os.environ.get("WORLD_SIZE", 1))
+
+
+    #     # sampler = UniqueClassSempler(
+    #     #     ds_train.ys, num_samples, local_rank, world_size
+    #     # )
+
+    #     # dl_train = DataLoader(
+    #     #     dataset=ds_train,
+    #     #     sampler=sampler,
+    #     #     batch_size=self.args['loader_tr_args']['batch_size'],
+    #     # )
+
+    #     print('len(idxs_train)={}'.format(len(idxs_train)))
+    #     sampler2 = UniqueClassSempler(
+    #         self.Y.numpy()[idxs_train], num_samples, local_rank, world_size
+    #     )
+
+    #     dl_train2 = DataLoader(
+    #                 self.handler(self.X[idxs_train], torch.Tensor(self.Y.numpy()[idxs_train]).long(), 
+    #                 transform=self.args['transform']),
+    #                 sampler=sampler2, **self.args['loader_tr_args']
+    #         )
+
+    #     cuda_ind = 0 ##which gpu to use
+    #     # epoch, attempts (early stopping), training accuracy
+    #     if verbose: print('epoch, attempts, training accuracy:, acc', flush=True)
+    #     epoch = 0
+    #     bestAcc = 0.
+    #     attempts = 0
+    #     accCurrent = 0
+    #     while epoch < self.args['max_epoch'] and accCurrent < 0.99: #train for max_epoch epoches at most
+    #         if not isinstance(self.clf, nn.DataParallel):
+    #             print('enabling multiple gpus')
+    #             self.clf = self.enable_multiple_gpu_model(self.clf)
+
+    #         self.clf.train()
+    #         sampler2.set_epoch(epoch)
+    #         stats_ep = []
+    #         accCurrent = 0.
+    #         num_samples_runned = 0
+    #         for batch_idx, (x, y, idxs) in enumerate(dl_train2):
+    #             # print(x[0].sum(), x[1].sum(), x[2].sum(),x[3].sum())
+    #             # print(x[0].mean(), x[1].mean(), x[2].mean(),x[3].mean())
+    #             # print(y)
+    #             # print('idxs=',idxs)
+    #             x, y = Variable(x.to(torch.device(f"cuda:{cuda_ind}"))), Variable(y.to(torch.device(f"cuda:{cuda_ind}")))
+    #             orgional_y = deepcopy(y)
+    #             y = y.view(len(y) // num_samples, num_samples)
+    #             assert (y[:, 0] == y[:, -1]).all()
+    #             s = y[:, 0].tolist()
+    #             assert len(set(s)) == len(s)
+
+    #             out, e1 = self.clf(x)
+    #             z = e1.view(len(x) // num_samples, num_samples, emb).to(torch.device(f"cuda:{cuda_ind}"))
+    #             if world_size > 1:
+    #                 with torch.no_grad():
+    #                     all_z = [torch.zeros_like(z) for _ in range(world_size)]
+    #                     torch.distributed.all_gather(all_z, z)
+    #                 all_z[local_rank] = z
+    #                 z = torch.cat(all_z)
+    #             loss = 0
+    #             for i in range(num_samples):
+    #                 for j in range(num_samples):
+    #                     if i != j:
+    #                         l, s = contrastive_loss(z[:, i], z[:, j], target=y,
+    #                                 tau=t, hyp_c=self.args['poincare_ball_curvature'], 
+    #                                 cuda_ind=cuda_ind)
+    #                         loss += l
+    #                         stats_ep.append({**s, "loss": l.item()})
+
+    #             # loss /= num_samples*num_samples-num_samples
+    #             # ce_loss = F.cross_entropy(out.to(torch.device(f"cuda:{cuda_ind}")), orgional_y)
+    #             ce_loss = 0
+    #             loss += ce_loss
+    #             print('loss', loss, ce_loss)
+    #             optimizer.zero_grad()
+    #             # with amp.scale_loss(loss, optimizer) as scaled_loss:
+    #             #     scaled_loss.backward()
+    #             loss.backward()
+    #             torch.nn.utils.clip_grad_norm_(self.clf.parameters(), 3)
+    #             optimizer.step()
+
+    #             batchProbs = F.softmax(out, dim=1)
+    #             maxInds = torch.argmax(batchProbs,1).data.cpu()
+    #             accCurrent += torch.sum(maxInds == orgional_y.data.cpu()).float().data.item()
+    #             num_samples_runned += len(orgional_y)
+
+    #         accCurrent /= num_samples_runned
+    #         if bestAcc < accCurrent:
+    #             bestAcc = accCurrent
+    #             attempts = 0
+    #         else: attempts += 1
+    #         epoch += 1
+    #         if verbose: print(str(epoch) + '_' + str(attempts) + ' training accuracy: ' + str(accCurrent), flush=True)
+    #         # reset if not converging
+    #         if (epoch % 1000 == 0) and (accCurrent < 0.2) and (self.args['modelType'] != 'linear'):
+    #             self.clf = self.net.apply(weight_reset)
+    #             optimizer = optim.Adam(self.clf.parameters(), lr = self.args['lr'], weight_decay=0)
+
 
 
 class HyperNorm_plus_RiemannianBadge_Sampling(Strategy):
@@ -1092,6 +1222,81 @@ class HypNetBadgePoincareKmeansSampling(Strategy):
         self.output_sample_dir = os.path.join(self.output_dir, 'samples')
         create_directory(self.output_image_dir)
         create_directory(self.output_sample_dir)
+        self.iteration_ind = 0
+
+    # kmeans ++ initialization
+    def init_centers_hyp(self, X, K):
+        ind = np.argmax([np.linalg.norm(s, 2) for s in X])
+        ## use the real norm to get the max gradient one
+        # hyper_emb_norm = [self.manifold.norm(torch.tensor(s), self.curvature) for s in X]
+        # ind = np.argmax(hyper_emb_norm, axis=0)
+        # print(f'ind0={ind0}, ind={ind}') # they are the same
+
+        mu = [X[ind]]
+        indsAll = [ind]
+        centInds = [0.] * len(X)
+        cent = 0
+        # print('#Samps\tTotal Distance')
+        while len(mu) < K:
+            if len(mu) == 1:
+                D2 = self.manifold.sqdist(X, mu[-1], self.curvature).ravel().numpy().astype(float)
+            else:
+                newD = self.manifold.sqdist(X, mu[-1], self.curvature).ravel().numpy().astype(float)
+                for i in range(len(X)):
+                    if D2[i] > newD[i]:
+                        centInds[i] = cent
+                        D2[i] = newD[i]
+            # print(str(len(mu)) + '\t' + str(sum(D2)), flush=True)
+            #if sum(D2) == 0.0: pdb.set_trace()
+            D2 = D2.ravel().astype(float)
+            Ddist = (D2 ** 2) / sum(D2 ** 2)
+            customDist = stats.rv_discrete(name='custm', values=(np.arange(len(D2)), Ddist))
+            ind = customDist.rvs(size=1)[0]
+            while ind in indsAll: ind = customDist.rvs(size=1)[0]
+            mu.append(X[ind])
+            indsAll.append(ind)
+            cent += 1
+        return indsAll
+
+    def query(self, n):
+        """
+            option 1: use regular gradient in badge
+            option 2: fix grad using riemannian gradient in badge
+       """
+        use_Riemannian_grad_badge = True
+
+        idxs_unlabeled = np.arange(self.n_pool)[~self.idxs_lb]
+
+        gradEmbedding, embedding = self.get_grad_embedding_for_hyperNet(self.X, self.Y.numpy(), 
+                                                             fix_grad=use_Riemannian_grad_badge,
+                                                             RiemannianGradient_c=self.curvature,
+                                                             get_raw_embedding=True,
+                                                             back_to_euclidean=False)
+        chosen = self.init_centers_hyp(torch.tensor(gradEmbedding[idxs_unlabeled]), n)
+        ## old normalization
+        # embedding = embedding / max([np.linalg.norm(s, 2) for s in embedding])
+        self.save_images_and_embeddings(embedding, idxs_unlabeled, chosen, self.iteration_ind)
+        self.iteration_ind += 1
+        return idxs_unlabeled[chosen]
+
+
+class HypNetEmbeddingPoincareKmeansSampling(Strategy):
+    """
+        use hyperbolic layer as last layer,
+        use normal cross entropy as BADGE.
+        use Poincare Kmeans
+    """
+    def __init__(self, X, Y, idxs_lb, net, handler, args):
+        super(HypNetEmbeddingPoincareKmeansSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
+        self.curvature = args['poincare_ball_curvature']
+        self.manifold = PoincareBall()
+
+        self.output_dir = args['output_dir']
+        self.output_image_dir = os.path.join(self.output_dir,'images')
+        self.output_sample_dir = os.path.join(self.output_dir, 'samples')
+        create_directory(self.output_image_dir)
+        create_directory(self.output_sample_dir)
+        self.iteration_ind = 0
 
     # kmeans ++ initialization
     def init_centers_hyp(self, X, K):
@@ -1122,7 +1327,7 @@ class HypNetBadgePoincareKmeansSampling(Strategy):
             cent += 1
         return indsAll
 
-   def query(self, n):
+    def query(self, n):
         """
             option 1: use regular gradient in badge
             option 2: fix grad using riemannian gradient in badge
@@ -1131,12 +1336,13 @@ class HypNetBadgePoincareKmeansSampling(Strategy):
 
         idxs_unlabeled = np.arange(self.n_pool)[~self.idxs_lb]
 
-        gradEmbedding, embedding = self.get_grad_embedding_for_hyperNet(self.X[idxs_unlabeled], self.Y.numpy()[idxs_unlabeled], 
-                                                             fix_grad=use_Riemannian_grad_badge,
-                                                             RiemannianGradient_c=self.curvature)
-        chosen = self.init_centers_hyp(torch.tensor(gradEmbedding), n)
-        self.save_images_and_embeddings(embedding, idxs_unlabeled, chosen)
+        embedding = self.get_hyperbolic_embedding(self.X, self.Y).numpy()
+        chosen = self.init_centers_hyp(torch.tensor(embedding[idxs_unlabeled]), n) #note the only difference with hyperBadge
+        self.save_images_and_embeddings(embedding, idxs_unlabeled, chosen, self.iteration_ind)
+        self.iteration_ind += 1
         return idxs_unlabeled[chosen]
+
+
 
 # class UmapKmeansSampling(Strategy):
 #     def __init__(self, X, Y, idxs_lb, net, handler, args):
