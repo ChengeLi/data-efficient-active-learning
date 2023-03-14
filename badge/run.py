@@ -376,7 +376,7 @@ elif opts.alg == 'umap':
     strategy = UmapKmeansSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'meal':
     strategy = MEALSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
-elif opts.alg == 'PoincareKmeans_argmax':
+elif opts.alg == 'PoincareKmeans':
     strategy = PoincareKmeansSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'PoincareKmeansUncertainty':
     strategy = PoincareKmeansUncertaintySampling(X_tr, Y_tr, idxs_lb, net, handler, args)
