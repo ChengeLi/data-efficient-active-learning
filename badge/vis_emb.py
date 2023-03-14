@@ -8,11 +8,14 @@ import umap
 from query_strategies.util import create_directory
 
 visualize_embedding = True
-experiment_path = '/home/ubuntu/workplace/code/data-efficient-active-learning/badge/output/MNIST_net00_embDim20_c1-15_PoincareKmeansUncertainty_500'
+experiment_path = '/home/ubuntu/workplace/code/data-efficient-active-learning/badge/output/CIFAR10_net00_embDim20_c1-15_PoincareKmeans_500'
+# experiment_path = '/home/ubuntu/workplace/code/data-efficient-active-learning/badge/output/CIFAR10_net00_embDim20_c1-15_meal_500'
+# experiment_path = '/home/ubuntu/workplace/code/data-efficient-active-learning/badge/output/CIFAR10_net00_embDim20_c1-15_badge_500'
+# experiment_path = '/home/ubuntu/workplace/code/data-efficient-active-learning/badge/output/MNIST_net00_embDim20_c1-15_PoincareKmeansUncertainty_500'
 # experiment_path = '/home/ubuntu/workplace/code/data-efficient-active-learning/badge/output/MNIST_net00_embDim20_meal_500'
 # experiment_path = '/home/ubuntu/workplace/code/data-efficient-active-learning/badge/output/MNIST_net00_embDim20_badge_500/'
 # experiment_path = '/home/ubuntu/workplace/code/data-efficient-active-learning/badge/output/MNIST_net00_embDim20_curvature-1-15_PoincareKmeans_500/'
-img_dir = os.path.join(experiment_path,'images')
+img_dir = os.path.join(experiment_path,'images3')
 emb_dir = os.path.join(experiment_path,'samples')
 create_directory(img_dir)
 img_path = os.path.join(img_dir, "emb_{:05d}.png".format(98))
@@ -27,7 +30,7 @@ for i in range(0, 99, 2):
         Y = emb[:,0]
         emb = emb[:,1:]
 
-        hyper_emb = umap.UMAP(output_metric='hyperboloid', random_state=42, tqdm_kwds={'disable': False}).fit_transform(emb)
+        hyper_emb = umap.UMAP(output_metric='hyperboloid',n_epochs=1, random_state=42, tqdm_kwds={'disable': False}).fit_transform(emb)
 
         x = hyper_emb[:, 0]
         y = hyper_emb[:, 1]
@@ -39,14 +42,17 @@ for i in range(0, 99, 2):
         fig = plt.figure(figsize=(5, 5))
         ax = fig.add_subplot(111)
         ax.scatter(disk_x, disk_y, c=Y, marker='.', cmap='Spectral')
-        ax.scatter(disk_x[chosen_indexes],
+        scatter = ax.scatter(disk_x[chosen_indexes],
                    disk_y[chosen_indexes],
                    c=selected_emb.T[0],
                    edgecolor='black', linewidth=1, marker='o', cmap='Spectral')
         boundary = plt.Circle((0, 0), 1, fc='none', ec='k')
         ax.add_artist(boundary)
+        legend1 = ax.legend(*scatter.legend_elements(),
+                            loc="lower left", title="Classes")
+        ax.add_artist(legend1)
         ax.axis('off')
-        plt.savefig(img_path)
+        # plt.savefig(img_path)
         plt.close('all')
 
 

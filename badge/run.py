@@ -276,8 +276,10 @@ class mlpMod(nn.Module):
 
 EXPERIMENT_NAME = DATA_NAME + '_' + opts.model + '_' + opts.alg + '_' + str(NUM_QUERY)
 if opts.model == 'net00':
-    EXPERIMENT_NAME = DATA_NAME + '_' + opts.model + '_embDim20_c1-15_'  + opts.alg + '_' + str(
-        NUM_QUERY)
+    EXPERIMENT_NAME = DATA_NAME + '_' + opts.model + '_embDim20_'  + opts.alg + '_' + str(NUM_QUERY)
+    if opts.alg in ['PoincareKmeans', 'PoincareKmeansUncertainty']:
+        EXPERIMENT_NAME = DATA_NAME + '_' + opts.model + '_embDim20_c1-15_' + opts.alg + '_' + str(NUM_QUERY)
+
 args['output_dir'] = os.path.join('./badge/output', EXPERIMENT_NAME)
 create_directory(args['output_dir'])
 # load specified network
@@ -334,7 +336,7 @@ elif opts.alg == 'umap':
     strategy = UmapKmeansSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'meal':
     strategy = MEALSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
-elif opts.alg == 'PoincareKmeans_argmax':
+elif opts.alg == 'PoincareKmeans':
     strategy = PoincareKmeansSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
 elif opts.alg == 'PoincareKmeansUncertainty':
     strategy = PoincareKmeansUncertaintySampling(X_tr, Y_tr, idxs_lb, net, handler, args)

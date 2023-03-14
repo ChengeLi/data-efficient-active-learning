@@ -171,7 +171,7 @@ class PoincareKmeansUncertaintySampling(Strategy):
 
     # kmeans ++ initialization
     def init_centers_hyp(self, X, K):
-        ind = np.argmax([self.manifold.norm(torch.tensor(s), self.curvature) for s in X])
+        ind = np.argmin([self.manifold.norm(torch.tensor(s), self.curvature) for s in X])
         mu = [X[ind]]
         indsAll = [ind]
         centInds = [0.] * len(X)
@@ -208,7 +208,7 @@ class PoincareKmeansUncertaintySampling(Strategy):
         else:
             selected_sample_name = os.path.join(self.output_sample_dir, 'chosen_00000.csv')
             all_emb_name = os.path.join(self.output_sample_dir, 'emb_00000.npy')
-        n_uncertainty = int(0.01*n)
+        n_uncertainty = int(0.75*n)
         n_diversity = int(n-n_uncertainty)
         # Get embedding for all data
         embedding = self.get_embedding(self.X, self.Y)
@@ -261,7 +261,7 @@ class PoincareKmeansSampling(Strategy):
 
     # kmeans ++ initialization
     def init_centers_hyp(self, X, K):
-        ind = np.argmax([self.manifold.norm(torch.tensor(s), self.curvature) for s in X])
+        ind = np.argmin([self.manifold.norm(torch.tensor(s), self.curvature) for s in X])
         mu = [X[ind]]
         indsAll = [ind]
         centInds = [0.] * len(X)
