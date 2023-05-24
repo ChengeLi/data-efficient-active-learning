@@ -25,12 +25,12 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from copy import deepcopy
 from tqdm import tqdm
-import hyptorch.pmath as pmath
-from hyptorch.loss import contrastive_loss
+# import hyptorch.pmath as pmath
+# from hyptorch.loss import contrastive_loss
 # from apex import amp
 
 import multiprocessing
-from hyptorch.sampler import UniqueClassSempler
+# from hyptorch.sampler import UniqueClassSempler
 from torch.autograd import Variable
 # from dataset import CUBirds
 

@@ -14,8 +14,8 @@ from torch.distributions.categorical import Categorical
 import os
 import pandas as pd
 from matplotlib import pyplot as plt
-import hyptorch.pmath as pmath
-from hyptorch.loss import contrastive_loss
+# import hyptorch.pmath as pmath
+# from hyptorch.loss import contrastive_loss
 import umap
 
 class Strategy:
