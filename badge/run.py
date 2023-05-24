@@ -311,8 +311,8 @@ elif opts.model == 'resnet':
 elif opts.model == 'resnet50':
     net = resnet.ResNet50(dataset=DATA_NAME, num_classes=opts.nClasses)
 elif opts.model == 'vgg':
-    net = vgg.vgg16_bn(num_classes=opts.nClasses)
-    # net = vgg.VGG('VGG16', num_classes=opts.nClasses)
+    # net = vgg.vgg16_bn(num_classes=opts.nClasses, pretrained=False) # from VAAL but does not train well and don't know why
+    net = vgg.VGG('VGG16', num_classes=opts.nClasses)
 elif opts.model == 'lin':
     dim = np.prod(list(X_tr.shape[1:]))
     net = linMod(dim=int(dim))
