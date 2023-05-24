@@ -297,7 +297,7 @@ elif 'HyperNet' in opts.model:
                     +'_balldim{}_c{}'.format(args['poincare_ball_dim'], args['poincare_ball_curvature']) \
                     +'clipr' # + '_newlossonly_batchsize250'
 else:
-    EXPERIMENT_NAME = DATA_NAME + '_' + opts.model + '_' + opts.alg + '_' + str(NUM_QUERY) + '_dum'
+    EXPERIMENT_NAME = DATA_NAME + '_' + opts.model + '_' + opts.alg + '_' + str(NUM_QUERY)
 
 print('EXPERIMENT_NAME={}'.format(EXPERIMENT_NAME))
 
