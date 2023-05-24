@@ -19,6 +19,46 @@ def get_net(name):
     #     return ResNet50
 
 
+# linear model class
+class linMod(nn.Module):
+    def __init__(self, dim=28):
+        super(linMod, self).__init__()
+        self.dim = dim
+        self.lm = nn.Linear(dim, opts.nClasses)
+
+    def forward(self, x):
+        x = x.view(-1, self.dim)
+        out = self.lm(x)
+        return out, x
+
+    def get_embedding_dim(self):
+        return self.dim
+
+
+# mlp model class
+class mlpMod(nn.Module):
+    def __init__(self, dim, embSize=128, useNonLin=True):
+        super(mlpMod, self).__init__()
+        self.embSize = embSize
+        self.dim = int(np.prod(dim))
+        self.lm1 = nn.Linear(self.dim, embSize)
+        self.lm2 = nn.Linear(embSize, embSize)
+        self.linear = nn.Linear(embSize, opts.nClasses, bias=False)
+        self.useNonLin = useNonLin
+
+    def forward(self, x):
+        x = x.view(-1, self.dim)
+        if self.useNonLin:
+            emb = F.relu(self.lm1(x))
+        else:
+            emb = self.lm1(x)
+        out = self.linear(emb)
+        return out, emb
+
+    def get_embedding_dim(self):
+        return self.embSize
+
+
 class HyperNet(nn.Module):
     # https://github.com/leymir/hyperbolic-image-embeddings/blob/master/examples/mnist.py
     def __init__(self, args):
@@ -222,6 +262,10 @@ class Net00(nn.Module):
             self.flattened_dim = 4 * 4 * 50
         elif dataset=='CIFAR10':
             classes = 10
+            input_channel = 3
+            self.flattened_dim = 5 * 5 * 50
+        elif dataset=='CIFAR100':
+            classes = 100
             input_channel = 3
             self.flattened_dim = 5 * 5 * 50
         elif dataset=='CUB':

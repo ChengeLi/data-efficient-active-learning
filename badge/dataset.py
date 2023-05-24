@@ -22,6 +22,8 @@ def get_dataset(name, path, args):
         return get_SVHN(path)
     elif name == 'CIFAR10':
         return get_CIFAR10(path)
+    elif name == 'CIFAR100':
+        return get_CIFAR100(path)
     elif name == 'CUB':
         return get_CUB(path, args)
 
@@ -55,6 +57,15 @@ def get_SVHN(path):
 def get_CIFAR10(path):
     data_tr = datasets.CIFAR10(path + '/CIFAR10', train=True, download=True)
     data_te = datasets.CIFAR10(path + '/CIFAR10', train=False, download=True)
+    X_tr = data_tr.data
+    Y_tr = torch.from_numpy(np.array(data_tr.targets))
+    X_te = data_te.data
+    Y_te = torch.from_numpy(np.array(data_te.targets))
+    return X_tr, Y_tr, X_te, Y_te
+
+def get_CIFAR100(path):
+    data_tr = datasets.CIFAR100(path + '/CIFAR100', train=True, download=True)
+    data_te = datasets.CIFAR100(path + '/CIFAR100', train=False, download=True)
     X_tr = data_tr.data
     Y_tr = torch.from_numpy(np.array(data_tr.targets))
     X_te = data_te.data
@@ -96,6 +107,8 @@ def get_handler(name):
     elif name == 'SVHN':
         return DataHandler2
     elif name == 'CIFAR10':
+        return DataHandler3
+    elif name == 'CIFAR100':
         return DataHandler3
     else:
         return DataHandler4

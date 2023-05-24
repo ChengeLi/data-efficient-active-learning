@@ -64,7 +64,7 @@ class Strategy:
             if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
                 m.reset_parameters()
 
-        n_epoch = self.args['n_epoch']
+        # n_epoch = self.args['n_epoch']
         if reset: self.clf =  self.net.apply(weight_reset).cuda()
         if type(net) != list: self.clf = net
         if type(optimizer) == int: optimizer = optim.Adam(self.clf.parameters(), lr = self.args['lr'], weight_decay=0)
@@ -131,7 +131,7 @@ class Strategy:
         valTensor = torch.Tensor(self.Y.numpy()[idxs_val]).long()
         attemptThresh = 10
         while True:
-            accCurrent, lossCurrent = self._train(epoch, loader_tr, optimizer)
+            # accCurrent, lossCurrent = self._train(epoch, loader_tr, optimizer)
             valPreds = self.predict_prob(self.X[idxs_val], valTensor, exp=False)
             loss = ce(valPreds, valTensor).item()
             if loss < bestLoss:

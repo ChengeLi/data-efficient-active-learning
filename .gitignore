@@ -11,6 +11,7 @@ wandb/
 *.t7
 *.jpeg
 *.png
+*.xlsx
 
 # Environments
 .env
@@ -50,3 +51,6 @@ share/python-wheels/
 *.egg
 MANIFEST
 /badge/results/
+/data
+/badge/output
+/badge/plots

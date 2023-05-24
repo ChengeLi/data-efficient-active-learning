@@ -18,7 +18,7 @@ from query_strategies.hyperbolic_embedding_umap_sampling import HypUmapSampling,
     PoincareKmeansSamplingNew, MEALSampling, PoincareKmeansUncertaintySampling
 from dataset import get_dataset, get_handler
 # from model import get_net
-from model import HyperNet, Net0, Net00, HyperNet2, HyperNet3, HyperResNet50
+from model import HyperNet, Net0, Net00, mlpMod, linMod, HyperNet2, HyperNet3, HyperResNet50
 import vgg
 import resnet
 from sklearn.preprocessing import LabelEncoder
@@ -44,7 +44,7 @@ parser.add_argument('--alg', help='acquisition algorithm', type=str, default='ra
 parser.add_argument('--did', help='openML dataset index, if any', type=int, default=0)
 parser.add_argument('--lr', help='learning rate', type=float, default=1e-4)
 parser.add_argument('--model', help='model - resnet, vgg, or mlp', type=str, default='mlp')
-parser.add_argument('--path', help='data path', type=str, default='data')
+parser.add_argument('--path', help='data path', type=str, default='./data')
 parser.add_argument('--data', help='dataset (non-openML)', type=str, default='')
 parser.add_argument('--nQuery', help='number of points to query in a batch', type=int, default=100)
 parser.add_argument('--nStart', help='number of points to start', type=int, default=100)
@@ -70,7 +70,7 @@ NUM_QUERY = opts.nQuery
 NUM_ROUND = int((opts.nEnd - NUM_INIT_LB) / opts.nQuery)
 # regularization settings for bait
 opts.lamb = 1
-visualize_embedding = True
+visualize_embedding = False
 visualize_learningcurve = True
 # non-openml data defaults
 args_pool = {'MNIST':
@@ -106,6 +106,21 @@ args_pool = {'MNIST':
                       transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
                   ]),
                   'loader_tr_args': {'batch_size': 128, 'num_workers': 1},
+                  'loader_te_args': {'batch_size': 1000, 'num_workers': 1},
+                  'optimizer_args': {'lr': 0.05, 'momentum': 0.3},
+                  'transformTest': transforms.Compose([transforms.ToTensor(),
+                                                       transforms.Normalize((0.4914, 0.4822, 0.4465),
+                                                                            (0.2470, 0.2435, 0.2616))])},
+            'CIFAR100':
+                 {'n_epoch': 3,
+                  'max_epoch': 100,
+                  'transform': transforms.Compose([
+                      transforms.RandomCrop(32, padding=4),
+                      transforms.RandomHorizontalFlip(),
+                      transforms.ToTensor(),
+                      transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
+                  ]),
+                  'loader_tr_args': {'batch_size': 64, 'num_workers': 1},
                   'loader_te_args': {'batch_size': 1000, 'num_workers': 1},
                   'optimizer_args': {'lr': 0.05, 'momentum': 0.3},
                   'transformTest': transforms.Compose([transforms.ToTensor(),
@@ -150,8 +165,19 @@ args_pool = {'MNIST':
              }
 if DATA_NAME in ['MNIST', 'CIFAR10']:
     opts.nClasses = 10
+    opts.nQuery = 500
 elif DATA_NAME=='CUB':
     opts.nClasses = 200
+    opts.nQuery = 500
+elif DATA_NAME=='CIFAR100':
+    opts.nClasses = 100
+    opts.nQuery = 2500
+    opts.nStart = 5000 #initial_budget based on VAAL paper
+    opts.lr = 5e-4 #learning rate based on VAAL paper
+
+elif DATA_NAME == 'CAL256':
+    opts.nClasses = 256
+    opts.nQuery = 500
 
 if opts.model == 'swin_t':
     args_pool['max_epoch'] = 200
@@ -165,6 +191,7 @@ if opts.model == 'swin_t':
 
 if opts.aug == 0:
     args_pool['CIFAR10']['transform'] = args_pool['CIFAR10']['transformTest']  # remove data augmentation
+    args_pool['CIFAR100']['transform'] = args_pool['CIFAR100']['transformTest']  # remove data augmentation
 args_pool['MNIST']['transformTest'] = args_pool['MNIST']['transform']
 args_pool['FashionMNIST']['transformTest'] = args_pool['FashionMNIST']['transform']
 args_pool['SVHN']['transformTest'] = args_pool['SVHN']['transform']
@@ -261,44 +288,6 @@ np.random.shuffle(idxs_tmp)
 idxs_lb[idxs_tmp[:NUM_INIT_LB]] = True
 
 
-# linear model class
-class linMod(nn.Module):
-    def __init__(self, dim=28):
-        super(linMod, self).__init__()
-        self.dim = dim
-        self.lm = nn.Linear(dim, opts.nClasses)
-
-    def forward(self, x):
-        x = x.view(-1, self.dim)
-        out = self.lm(x)
-        return out, x
-
-    def get_embedding_dim(self):
-        return self.dim
-
-
-# mlp model class
-class mlpMod(nn.Module):
-    def __init__(self, dim, embSize=128, useNonLin=True):
-        super(mlpMod, self).__init__()
-        self.embSize = embSize
-        self.dim = int(np.prod(dim))
-        self.lm1 = nn.Linear(self.dim, embSize)
-        self.lm2 = nn.Linear(embSize, embSize)
-        self.linear = nn.Linear(embSize, opts.nClasses, bias=False)
-        self.useNonLin = useNonLin
-
-    def forward(self, x):
-        x = x.view(-1, self.dim)
-        if self.useNonLin:
-            emb = F.relu(self.lm1(x))
-        else:
-            emb = self.lm1(x)
-        out = self.linear(emb)
-        return out, emb
-
-    def get_embedding_dim(self):
-        return self.embSize
 
 
 if opts.model == 'net00':
@@ -320,9 +309,9 @@ if opts.model == 'mlp':
 elif opts.model == 'resnet':
     net = resnet.ResNet18(num_classes=opts.nClasses)
 elif opts.model == 'resnet50':
-    net = resnet.ResNet50(num_classes=opts.nClasses)
+    net = resnet.ResNet50(dataset=DATA_NAME, num_classes=opts.nClasses)
 elif opts.model == 'vgg':
-    net = vgg.VGG('VGG16')
+    net = vgg.VGG('VGG16', num_classes=opts.nClasses)
 elif opts.model == 'lin':
     dim = np.prod(list(X_tr.shape[1:]))
     net = linMod(dim=int(dim))
@@ -495,7 +484,7 @@ if visualize_learningcurve:
     plt.xlabel('Samples')
     plt.ylabel('Accuracy')
     plt.title(EXPERIMENT_NAME)
-    plt.ylim([0.5, 1.0])
+    plt.ylim([0.0, 1.0])
     plt.legend()
     plt.grid('on')
     fig.savefig(os.path.join(args['output_dir'], EXPERIMENT_NAME + '_learning_curve.png'))
