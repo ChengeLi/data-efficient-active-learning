@@ -1,7 +1,6 @@
 import math
 import os
 import random
-
 import numpy as np
 import pdb
 from sklearnex import patch_sklearn
@@ -9,32 +8,18 @@ patch_sklearn()
 import pandas as pd
 import scipy
 import torch
-from torch import nn
 from matplotlib import pyplot as plt
 from scipy import stats
 from sklearn.metrics import pairwise_distances, adjusted_rand_score, adjusted_mutual_info_score
 from .strategy import Strategy
 import umap
 import umap.plot
-# hyperparams
 from manifolds import Hyperboloid, PoincareBall
 from .util import create_directory, plot_clusters_no_edge
 import pdb
-import torch.nn.functional as F
-import torch.optim as optim
-from torch.utils.data import DataLoader
-from copy import deepcopy
-from tqdm import tqdm
-# import hyptorch.pmath as pmath
-# from hyptorch.loss import contrastive_loss
-# from apex import amp
-
-import multiprocessing
-# from hyptorch.sampler import UniqueClassSempler
-from torch.autograd import Variable
-# from dataset import CUBirds
 
 
+# hyperparams
 PROJ_EPS = 1e-3
 EPS = 1e-15
 MAX_TANH_ARG = 15.0
@@ -261,8 +246,6 @@ class PoincareKmeansUncertaintySampling(Strategy):
 
         del df
         return idxs_unlabeled[chosen]
-
-
 
 
 class PoincareKmeansSampling(Strategy):
@@ -1528,76 +1511,76 @@ class BadgePoincareSampling(Strategy):
         del gradEmbedding_poincare, df, gradEmbedding
         return idxs_unlabeled[chosen]
 
-class BadgePoincareSampling(Strategy):
-    def __init__(self, X, Y, idxs_lb, net, handler, args):
-        super(BadgePoincareSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
-        self.manifold = PoincareBall()
-        self.curvature = 1 / 15  # based on plot 4 in HGCN paper
-        self.output_dir = args['output_dir']
-        self.output_sample_dir = os.path.join(self.output_dir, 'samples')
-        create_directory(self.output_sample_dir)
-
-    # kmeans ++ initialization
-    def init_centers_hyp(self, X, K):
-        ind = np.argmin([self.manifold.norm(s) for s in X])
-        mu = [X[ind]]
-        indsAll = [ind]
-        centInds = [0.] * len(X)
-        cent = 0
-        # print('#Samps\tTotal Distance')
-        while len(mu) < K:
-            if len(mu) == 1:
-                D2 = self.manifold.sqdist(X, mu[-1], self.curvature).ravel().numpy().astype(float)
-            else:
-                newD = self.manifold.sqdist(X, mu[-1], self.curvature).ravel().numpy().astype(float)
-                for i in range(len(X)):
-                    if D2[i] < newD[i]:
-                        centInds[i] = cent
-                        D2[i] = newD[i]
-            # print(str(len(mu)) + '\t' + str(sum(D2)), flush=True)
-            #if sum(D2) == 0.0: pdb.set_trace()
-            D2 = D2.ravel().astype(float)
-            Ddist = (D2 ** 2) / sum(D2 ** 2)
-            customDist = stats.rv_discrete(name='custm', values=(np.arange(len(D2)), Ddist))
-            ind = customDist.rvs(size=1)[0]
-            while ind in indsAll: ind = customDist.rvs(size=1)[0]
-            mu.append(X[ind])
-            indsAll.append(ind)
-            cent += 1
-        return indsAll
-
-    def query(self, n):
-        if len(os.listdir(self.output_sample_dir)) != 0:
-            name = int(sorted(os.listdir(self.output_sample_dir))[-1][4:-4]) + 1
-            selected_sample_name = os.path.join(self.output_sample_dir, "chosen_{:05d}.csv".format(name))
-            all_emb_name = os.path.join(self.output_sample_dir, "emb_{:05d}.npy".format(name))
-            del name
-        else:
-            selected_sample_name = os.path.join(self.output_sample_dir, 'chosen_00000.csv')
-            all_emb_name = os.path.join(self.output_sample_dir, "emb_00000.npy")
-        idxs_unlabeled = np.arange(self.n_pool)[~self.idxs_lb]
-        embedding = self.get_embedding(self.X, self.Y)
-        np.save(all_emb_name, np.concatenate([np.expand_dims(self.Y, axis=1), embedding], axis=1))
-        del embedding
-        print('Computing gradEmbedding ...')
-        gradEmbedding = self.get_grad_embedding(self.X[idxs_unlabeled], self.Y.numpy()[idxs_unlabeled])
-
-        print('Transform grad emb to Poincare ball space and normalize in that space ...')
-        gradEmbedding_poincare = self.manifold.expmap0(gradEmbedding.clone().detach(), self.curvature)
-        gradEmbedding_poincare = (gradEmbedding_poincare / max(self.manifold.norm(gradEmbedding_poincare)))
-
-        # fit unsupervised clusters and plot results
-        print('Running Hyperbolic Kmean++ in Poincare Ball space ...')
-        chosen = self.init_centers_hyp(gradEmbedding_poincare, n)
-
-        header_ = ['label', 'index']
-        df = pd.DataFrame(np.concatenate(
-            [np.expand_dims((self.Y[idxs_unlabeled[chosen]]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1)], axis=1),
-            columns=header_)
-        df.to_csv(selected_sample_name, index=False)
-
-        del gradEmbedding_poincare, df, gradEmbedding
-        return idxs_unlabeled[chosen]
+# class BadgePoincareSampling(Strategy):
+#     def __init__(self, X, Y, idxs_lb, net, handler, args):
+#         super(BadgePoincareSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
+#         self.manifold = PoincareBall()
+#         self.curvature = 1 / 15  # based on plot 4 in HGCN paper
+#         self.output_dir = args['output_dir']
+#         self.output_sample_dir = os.path.join(self.output_dir, 'samples')
+#         create_directory(self.output_sample_dir)
+#
+#     # kmeans ++ initialization
+#     def init_centers_hyp(self, X, K):
+#         ind = np.argmin([self.manifold.norm(s) for s in X])
+#         mu = [X[ind]]
+#         indsAll = [ind]
+#         centInds = [0.] * len(X)
+#         cent = 0
+#         # print('#Samps\tTotal Distance')
+#         while len(mu) < K:
+#             if len(mu) == 1:
+#                 D2 = self.manifold.sqdist(X, mu[-1], self.curvature).ravel().numpy().astype(float)
+#             else:
+#                 newD = self.manifold.sqdist(X, mu[-1], self.curvature).ravel().numpy().astype(float)
+#                 for i in range(len(X)):
+#                     if D2[i] < newD[i]:
+#                         centInds[i] = cent
+#                         D2[i] = newD[i]
+#             # print(str(len(mu)) + '\t' + str(sum(D2)), flush=True)
+#             #if sum(D2) == 0.0: pdb.set_trace()
+#             D2 = D2.ravel().astype(float)
+#             Ddist = (D2 ** 2) / sum(D2 ** 2)
+#             customDist = stats.rv_discrete(name='custm', values=(np.arange(len(D2)), Ddist))
+#             ind = customDist.rvs(size=1)[0]
+#             while ind in indsAll: ind = customDist.rvs(size=1)[0]
+#             mu.append(X[ind])
+#             indsAll.append(ind)
+#             cent += 1
+#         return indsAll
+#
+#     def query(self, n):
+#         if len(os.listdir(self.output_sample_dir)) != 0:
+#             name = int(sorted(os.listdir(self.output_sample_dir))[-1][4:-4]) + 1
+#             selected_sample_name = os.path.join(self.output_sample_dir, "chosen_{:05d}.csv".format(name))
+#             all_emb_name = os.path.join(self.output_sample_dir, "emb_{:05d}.npy".format(name))
+#             del name
+#         else:
+#             selected_sample_name = os.path.join(self.output_sample_dir, 'chosen_00000.csv')
+#             all_emb_name = os.path.join(self.output_sample_dir, "emb_00000.npy")
+#         idxs_unlabeled = np.arange(self.n_pool)[~self.idxs_lb]
+#         embedding = self.get_embedding(self.X, self.Y)
+#         np.save(all_emb_name, np.concatenate([np.expand_dims(self.Y, axis=1), embedding], axis=1))
+#         del embedding
+#         print('Computing gradEmbedding ...')
+#         gradEmbedding = self.get_grad_embedding(self.X[idxs_unlabeled], self.Y.numpy()[idxs_unlabeled])
+#
+#         print('Transform grad emb to Poincare ball space and normalize in that space ...')
+#         gradEmbedding_poincare = self.manifold.expmap0(gradEmbedding.clone().detach(), self.curvature)
+#         gradEmbedding_poincare = (gradEmbedding_poincare / max(self.manifold.norm(gradEmbedding_poincare)))
+#
+#         # fit unsupervised clusters and plot results
+#         print('Running Hyperbolic Kmean++ in Poincare Ball space ...')
+#         chosen = self.init_centers_hyp(gradEmbedding_poincare, n)
+#
+#         header_ = ['label', 'index']
+#         df = pd.DataFrame(np.concatenate(
+#             [np.expand_dims((self.Y[idxs_unlabeled[chosen]]).numpy(), axis=1), np.expand_dims(idxs_unlabeled[chosen], axis=1)], axis=1),
+#             columns=header_)
+#         df.to_csv(selected_sample_name, index=False)
+#
+#         del gradEmbedding_poincare, df, gradEmbedding
+#         return idxs_unlabeled[chosen]
 
 
 
