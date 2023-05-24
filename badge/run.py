@@ -62,7 +62,6 @@ random.seed(10)
 np.random.seed(10)
 # parameters
 DATA_NAME = opts.data
-
 # if DATA_NAME =='CUB':
 #     opts.nEnd = 5890
 NUM_INIT_LB = opts.nStart
