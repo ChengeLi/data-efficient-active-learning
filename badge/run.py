@@ -15,7 +15,7 @@ from query_strategies.util import create_directory
 from query_strategies.hyperbolic_embedding_umap_sampling import HypUmapSampling, HypNetBadgeSampling, \
     UmapPoincareKmeansSampling, UmapHyperboloidKmeansSampling, UmapHyperboloidKmeansSampling2, \
     HyperboloidKmeansSampling, PoincareKmeansSampling, HypNetNormSampling, UmapKmeansSampling, BadgePoincareSampling, \
-    PoincareKmeansSamplingNew, MEALSampling, PoincareKmeansUncertaintySampling, HypNetBadgePoincareKmeansSampling, \
+    MEALSampling, PoincareKmeansUncertaintySampling, HypNetBadgePoincareKmeansSampling, \
     HypNetEmbeddingPoincareKmeansSampling, HyperNorm_plus_RiemannianBadge_Sampling
 from dataset import get_dataset, get_handler
 # from model import get_net
@@ -311,7 +311,8 @@ elif opts.model == 'resnet':
 elif opts.model == 'resnet50':
     net = resnet.ResNet50(dataset=DATA_NAME, num_classes=opts.nClasses)
 elif opts.model == 'vgg':
-    net = vgg.VGG('VGG16', num_classes=opts.nClasses)
+    net = vgg.vgg16_bn(num_classes=opts.nClasses)
+    # net = vgg.VGG('VGG16', num_classes=opts.nClasses)
 elif opts.model == 'lin':
     dim = np.prod(list(X_tr.shape[1:]))
     net = linMod(dim=int(dim))
