@@ -2,6 +2,7 @@ from __future__ import print_function
 from __future__ import division
 import os.path
 
+import cv2
 import numpy as np
 import pdb
 import torch
@@ -12,6 +13,48 @@ from torchvision import transforms
 
 from cub200_dataset import Cub200
 import pdb
+def cifar10_transformer(mode='train'):
+    if mode=='train':
+        return transforms.Compose([
+               transforms.RandomHorizontalFlip(),
+               transforms.ToTensor(),
+               # transforms.Normalize(mean=[0.5, 0.5, 0.5,], std=[0.5, 0.5, 0.5]),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+           ])
+    elif mode=='test':
+        return transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+        ])
+
+def caltech256_transformer(mode='train'):
+    # Applying Transforms to the Data
+    image_transforms = {
+        'train': transforms.Compose([
+            transforms.RandomResizedCrop(size=256, scale=(0.8, 1.0)),
+            transforms.RandomRotation(degrees=15),
+            transforms.RandomHorizontalFlip(),
+            transforms.CenterCrop(size=224),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406],
+                                 [0.229, 0.224, 0.225])
+        ]),
+        'valid': transforms.Compose([
+            transforms.Resize(size=256),
+            transforms.CenterCrop(size=224),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406],
+                                 [0.229, 0.224, 0.225])
+        ]),
+        'test': transforms.Compose([
+            transforms.Resize(size=256),
+            transforms.CenterCrop(size=224),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406],
+                                 [0.229, 0.224, 0.225])
+        ])
+    }
+    return image_transforms[mode]
 
 def get_dataset(name, path, args):
     if name == 'MNIST':
@@ -24,6 +67,8 @@ def get_dataset(name, path, args):
         return get_CIFAR10(path)
     elif name == 'CIFAR100':
         return get_CIFAR100(path)
+    elif name == 'CalTech256':
+        return get_CalTech256(path)
     elif name == 'CUB':
         return get_CUB(path, args)
 
@@ -72,6 +117,46 @@ def get_CIFAR100(path):
     Y_te = torch.from_numpy(np.array(data_te.targets))
     return X_tr, Y_tr, X_te, Y_te
 
+def get_CalTech256(path):
+    if not os.path.isfile(os.path.join(path + '/Caltech256','X_tr.npy')):
+        data_ = datasets.Caltech256(path + '/Caltech256', download=True)
+        dataset_path = os.path.join(data_.root,'256_ObjectCategories')
+        category_dirs = [d for d in sorted(os.listdir(dataset_path)) if os.path.isdir(os.path.join(dataset_path, d))]
+        # Create lists to store the image files and corresponding labels
+        train_files = []
+        train_labels = []
+        test_files = []
+        test_labels = []
+        for category_dir in category_dirs[0:256]:
+            category_path = os.path.join(dataset_path, category_dir)
+            image_files = [os.path.join(category_path, f) for f in os.listdir(category_path) if f.endswith(".jpg")]
+            n_tr = int(np.ceil(len(image_files) * 0.9))
+            images = [cv2.cvtColor(cv2.imread(f), cv2.COLOR_BGR2RGB) for f in image_files[0:n_tr]]
+            train_files.extend(images)
+            train_labels.extend([category_dirs.index(category_dir)] * n_tr)
+            images = [cv2.cvtColor(cv2.imread(f), cv2.COLOR_BGR2RGB) for f in image_files[n_tr:]]
+            test_files.extend(images)
+            test_labels.extend([category_dirs.index(category_dir)] * (len(image_files) - n_tr))
+
+        X_tr = np.array(train_files)
+        Y_tr = np.array(train_labels)
+        np.save(os.path.join(path + '/Caltech256', 'X_tr.npy'), X_tr)
+        np.save(os.path.join(path + '/Caltech256', 'Y_tr.npy'), Y_tr)
+        Y_tr = torch.from_numpy(Y_tr)
+
+        X_te = np.array(test_files)
+        Y_te = np.array(test_labels)
+        np.save(os.path.join(path + '/Caltech256','X_te.npy'), X_te)
+        np.save(os.path.join(path + '/Caltech256','Y_te.npy'), Y_te)
+        Y_te = torch.from_numpy(Y_te)
+    else:
+        X_tr = np.load(os.path.join(path + '/Caltech256', 'X_tr.npy'), allow_pickle=True)
+        Y_tr = torch.from_numpy(np.load(os.path.join(path + '/Caltech256', 'Y_tr.npy')))
+        X_te = np.load(os.path.join(path + '/Caltech256', 'X_te.npy'), allow_pickle=True)
+        Y_te = torch.from_numpy(np.load(os.path.join(path + '/Caltech256', 'Y_te.npy')))
+
+    return X_tr, Y_tr, X_te, Y_te
+
 def get_CUB(path, args):
     dataset = Cub200('./data', args)
     X_tr, Y_tr, X_te, Y_te = dataset.get_train_test_data()
@@ -109,6 +194,8 @@ def get_handler(name):
     elif name == 'CIFAR10':
         return DataHandler3
     elif name == 'CIFAR100':
+        return DataHandler3
+    elif name == 'CalTech256':
         return DataHandler3
     else:
         return DataHandler4
