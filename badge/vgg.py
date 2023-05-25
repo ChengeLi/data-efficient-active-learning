@@ -3,7 +3,7 @@ import sys
 
 import torch
 import torch.nn as nn
-
+import torch.nn.functional as F
 # ## From badge implementation
 cfg = {
     'VGG11': [64, 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
@@ -74,8 +74,8 @@ class VGG(nn.Module):
         # print(x.size())
         # print(out.size())
         if self.dataset=='CUB' or self.dataset=='CalTech256':
-            out = self.linear1(out.view(out.size(0), -1))
-            emb = self.linear2(out)
+            out = F.relu(self.linear1(out.view(out.size(0), -1)))
+            emb = F.relu(self.linear2(out))
         elif self.dataset=='CIFAR100' or self.dataset=='CIFAR10':
             emb = out.view(out.size(0), -1)
         else:

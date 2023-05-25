@@ -16,23 +16,35 @@ import pdb
 def cifar10_transformer(mode='train'):
     if mode=='train':
         return transforms.Compose([
-               transforms.RandomHorizontalFlip(),
-               transforms.ToTensor(),
-               # transforms.Normalize(mean=[0.5, 0.5, 0.5,], std=[0.5, 0.5, 0.5]),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-           ])
+            transforms.RandomCrop(32, padding=4),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
+        ])
+        # VAAL - did not outperform ours
+        # return transforms.Compose([
+        #        transforms.RandomHorizontalFlip(),
+        #        transforms.ToTensor(),
+        #        # transforms.Normalize(mean=[0.5, 0.5, 0.5,], std=[0.5, 0.5, 0.5]),
+        #     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+        #    ])
     elif mode=='test':
         return transforms.Compose([
             transforms.ToTensor(),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
         ])
+        # VAAL - did not outperform ours
+        # return transforms.Compose([
+        #     transforms.ToTensor(),
+        #     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+        # ])
 
 def caltech256_transformer(mode='train'):
     # Applying Transforms to the Data
     image_transforms = {
         'train': transforms.Compose([
-            transforms.RandomResizedCrop(size=256, scale=(0.8, 1.0)),
-            transforms.RandomRotation(degrees=15),
+            transforms.Resize(size=224),
+            # transforms.RandomRotation(degrees=15),
             transforms.RandomHorizontalFlip(),
             transforms.CenterCrop(size=224),
             transforms.ToTensor(),
@@ -47,7 +59,7 @@ def caltech256_transformer(mode='train'):
                                  [0.229, 0.224, 0.225])
         ]),
         'test': transforms.Compose([
-            transforms.Resize(size=256),
+            transforms.Resize(size=224),
             transforms.CenterCrop(size=224),
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406],

@@ -1,7 +1,7 @@
 import numpy as np
-import sys
+# import sys
 import gc
-import gzip
+# import gzip
 import pickle
 # import openml
 import os
@@ -10,7 +10,7 @@ from tqdm import tqdm
 # from torch.nn import Linear, Sequential
 
 import swin
-from cub200_dataset import ImageJitter
+# from cub200_dataset import ImageJitter
 from query_strategies.util import create_directory
 from query_strategies.hyperbolic_embedding_umap_sampling import HypUmapSampling, HypNetBadgeSampling, \
     UmapPoincareKmeansSampling, UmapHyperboloidKmeansSampling, UmapHyperboloidKmeansSampling2, \
@@ -23,8 +23,8 @@ from model import HyperNet, Net0, Net00, mlpMod, linMod, HyperNet2, HyperNet3, H
 import vgg
 import resnet
 from sklearn.preprocessing import LabelEncoder
-import torch.nn.functional as F
-from torch import nn
+# import torch.nn.functional as F
+# from torch import nn
 from torchvision import transforms
 import torch
 import random, PIL
@@ -99,28 +99,21 @@ args_pool = {'MNIST':
              'CIFAR10':
                  {'n_epoch': 3,
                   'max_epoch': 100,
-                  'transform': transforms.Compose([
-                      transforms.RandomCrop(32, padding=4),
-                      transforms.RandomHorizontalFlip(),
-                      transforms.ToTensor(),
-                      transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
-                  ]),
+                  'transform': cifar10_transformer(mode='train'),
                   'loader_tr_args': {'batch_size': 128, 'num_workers': 1},
                   'loader_te_args': {'batch_size': 1000, 'num_workers': 1},
                   'optimizer_args': {'lr': 0.05, 'momentum': 0.3},
-                  'transformTest': transforms.Compose([transforms.ToTensor(),
-                                                       transforms.Normalize((0.4914, 0.4822, 0.4465),
-                                                                            (0.2470, 0.2435, 0.2616))])},
+                  'transformTest': cifar10_transformer(mode='test')},
             'CIFAR100':
                  {'n_epoch': 3,
                   'max_epoch': 100,
                   'transform': cifar10_transformer(mode='train'),
-                  'loader_tr_args': {'batch_size': 64, 'num_workers': 1},
+                  'loader_tr_args': {'batch_size': 128, 'num_workers': 1},
                   'loader_te_args': {'batch_size': 1000, 'num_workers': 1},
                   'optimizer_args': {'lr': 0.05, 'momentum': 0.3},
                   'transformTest': cifar10_transformer(mode='test')},
             'CalTech256':
-                 {'max_epoch': 100,
+                 {'max_epoch': 200,
                   'transform': caltech256_transformer(mode='train'),
                   'loader_tr_args': {'batch_size': 64, 'num_workers': 1},
                   'loader_te_args': {'batch_size': 64, 'num_workers': 1},
@@ -293,7 +286,7 @@ idxs_lb[idxs_tmp[:NUM_INIT_LB]] = True
 
 
 if opts.model == 'net00':
-    EXPERIMENT_NAME = DATA_NAME + '_' + opts.model +'_embDim20_' + '_' + opts.alg + '_' + str(NUM_QUERY)
+    EXPERIMENT_NAME = DATA_NAME + '_' + opts.model +'_embDim20_' + opts.alg + '_' + str(NUM_QUERY)
 elif 'HyperNet' in opts.model:
     EXPERIMENT_NAME = DATA_NAME + '_' + opts.model + opts.alg + '_' + str(NUM_QUERY) \
                     +'_balldim{}_c{}'.format(args['poincare_ball_dim'], args['poincare_ball_curvature']) \

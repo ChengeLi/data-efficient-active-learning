@@ -1,3 +1,4 @@
+import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 import hyptorch.nn as hypnn
@@ -21,7 +22,7 @@ def get_net(name):
 
 # linear model class
 class linMod(nn.Module):
-    def __init__(self, dim=28):
+    def __init__(self, opts, dim=28):
         super(linMod, self).__init__()
         self.dim = dim
         self.lm = nn.Linear(dim, opts.nClasses)
@@ -37,7 +38,7 @@ class linMod(nn.Module):
 
 # mlp model class
 class mlpMod(nn.Module):
-    def __init__(self, dim, embSize=128, useNonLin=True):
+    def __init__(self, dim, opts, embSize=128, useNonLin=True):
         super(mlpMod, self).__init__()
         self.embSize = embSize
         self.dim = int(np.prod(dim))
@@ -268,16 +269,25 @@ class Net00(nn.Module):
             classes = 100
             input_channel = 3
             self.flattened_dim = 5 * 5 * 50
+        elif dataset=='CalTech256':
+            classes = 256
+            input_channel = 3
+            self.flattened_dim = 6 * 6 * 50
         elif dataset=='CUB':
             classes = 200
             input_channel = 3
             self.flattened_dim = 50 * 13 * 13
 
         self.embedding_dim = 20
-
+        self.dataset = dataset
         # self.conv1 = nn.Conv2d(1, 20, 5, 1) #MNIST
-        self.conv1 = nn.Conv2d(input_channel, 20, 5, 1)
-        self.conv2 = nn.Conv2d(20, 50, 5, 1)
+        if self.dataset=='CalTech256':
+            self.conv1 = nn.Conv2d(input_channel, 20, 5, 2)
+            self.conv2 = nn.Conv2d(20, 30, 5, 2)
+            self.conv3 = nn.Conv2d(30, 50, 3, 2)
+        else:
+            self.conv1 = nn.Conv2d(input_channel, 20, 5, 1)
+            self.conv2 = nn.Conv2d(20, 50, 5, 1)
         self.fc1 = nn.Linear(self.flattened_dim, 500)
         self.fc2 = nn.Linear(500, self.embedding_dim) ### mimic poincare ball
         self.fc3 = nn.Linear(self.embedding_dim, classes)
@@ -293,6 +303,10 @@ class Net00(nn.Module):
         # print(x.size())
         x = F.relu(self.conv2(x))
         # print('3')
+        # print(x.size())
+        if self.dataset == 'CalTech256':
+            x = F.relu(self.conv3(x))
+        # print('44')
         # print(x.size())
         x = F.max_pool2d(x, 2, 2)
         # print('4')
