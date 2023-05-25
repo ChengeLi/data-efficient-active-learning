@@ -123,7 +123,7 @@ args_pool = {'MNIST':
                  {'max_epoch': 100,
                   'transform': caltech256_transformer(mode='train'),
                   'loader_tr_args': {'batch_size': 64, 'num_workers': 1},
-                  'loader_te_args': {'batch_size': 1000, 'num_workers': 1},
+                  'loader_te_args': {'batch_size': 64, 'num_workers': 1},
                   'optimizer_args': {'lr': 0.05, 'momentum': 0.3},
                   'transformTest':caltech256_transformer(mode='test')},
             #  'CUB':
@@ -177,7 +177,9 @@ elif DATA_NAME=='CIFAR100':
 
 elif DATA_NAME == 'CalTech256':
     opts.nClasses = 256
-    opts.nQuery = 1530
+    opts.nQuery = 1530 #initial_budget based on VAAL paper
+    opts.nStart = int(1530*2)  # initial_budget based on VAAL paper
+    opts.lr = 5e-4  # learning rate based on VAAL paper
 
 if opts.model == 'swin_t':
     args_pool['max_epoch'] = 200
@@ -417,6 +419,7 @@ if type(X_te) == torch.Tensor: X_te = X_te.numpy()
 results = []
 # round 0 accuracy
 strategy.train(verbose=True, model_selection=opts.model)
+# strategy.train_val(verbose=True)
 P = strategy.predict(X_te, Y_te)
 acc = np.zeros(NUM_ROUND + 1)
 acc[0] = 1.0 * (Y_te == P).sum().item() / len(Y_te)

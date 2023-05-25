@@ -16,9 +16,9 @@ class VGG_from_VAAL(nn.Module):
     def __init__(self, vgg_name, num_classes):
         super(VGG_from_VAAL, self).__init__()
         self.features = self._make_layers(cfg[vgg_name])
-        self.avgpool = nn.AdaptiveAvgPool2d((2, 2))
+        self.avgpool = nn.AdaptiveAvgPool2d((7, 7))
         self.classifier = nn.Sequential(
-            nn.Linear(512 * 2 * 2, 1024),
+            nn.Linear(512 * 7 * 7, 1024),
             nn.ReLU(True),
             # nn.Dropout(),
             nn.Linear(1024, 512),
@@ -29,7 +29,7 @@ class VGG_from_VAAL(nn.Module):
         self.final_layer = nn.Linear(512, num_classes)
 
     def forward(self, x):
-        print(x.size())
+        # print(x.size())
         out = self.features(x)
         out = self.avgpool(out)
         out = torch.flatten(out, 1)
@@ -71,8 +71,8 @@ class VGG(nn.Module):
 
     def forward(self, x):
         out = self.features(x)
-        print(x.size())
-        print(out.size())
+        # print(x.size())
+        # print(out.size())
         if self.dataset=='CUB' or self.dataset=='CalTech256':
             out = self.linear1(out.view(out.size(0), -1))
             emb = self.linear2(out)

@@ -89,7 +89,7 @@ class Strategy:
                 attempts = 0
             else: attempts += 1
             epoch += 1
-            if verbose: print(str(epoch) + '_' + str(attempts) + ' training accuracy: ' + str(accCurrent), flush=True)
+            if verbose: print(str(epoch) + '_' + str(attempts) + ' training accuracy: ' + str(np.round(accCurrent,decimals=4)), flush=True)
             # reset if not converging
             if (epoch % 1000 == 0) and (accCurrent < 0.2) and (self.args['modelType'] != 'linear'):
                 self.clf = self.net.apply(weight_reset)
