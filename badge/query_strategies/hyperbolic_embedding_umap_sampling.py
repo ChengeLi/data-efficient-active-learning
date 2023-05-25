@@ -166,7 +166,7 @@ class PoincareKmeansSampling(Strategy):  # HEAl1
     def __init__(self, X, Y, idxs_lb, net, handler, args):
         super(PoincareKmeansSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
         self.manifold = PoincareBall()
-        self.curvature = 1 / 15  # 0.03 0.5 #1/10 #1 / 15  # based on plot 4 in HGCN paper
+        self.curvature = args['poincare_ball_curvature'] # 0.03 0.5 #1/10 #1 / 15  # based on plot 4 in HGCN paper
         self.output_dir = args['output_dir']
         self.output_sample_dir = os.path.join(self.output_dir, 'samples')
         create_directory(self.output_sample_dir)
@@ -239,7 +239,7 @@ class PoincareKmeansUncertaintySampling(Strategy):  # HEAl2
     def __init__(self, X, Y, idxs_lb, net, handler, args):
         super(PoincareKmeansUncertaintySampling, self).__init__(X, Y, idxs_lb, net, handler, args)
         self.manifold = PoincareBall()
-        self.curvature = 1 / 15  # 0.03 0.5 #1/10 #1 / 15  # based on plot 4 in HGCN paper
+        self.curvature = args['poincare_ball_curvature']  # 0.03 0.5 #1/10 #1 / 15  # based on plot 4 in HGCN paper
         self.output_dir = args['output_dir']
         self.output_sample_dir = os.path.join(self.output_dir, 'samples')
         create_directory(self.output_sample_dir)
@@ -328,7 +328,7 @@ class PoincareKmeansSamplingNew(Strategy):
     def __init__(self, X, Y, idxs_lb, net, handler, args):
         super(PoincareKmeansSamplingNew, self).__init__(X, Y, idxs_lb, net, handler, args)
         self.manifold = PoincareBall()
-        self.curvature = 1 / 15  # 0.03 0.5 #1/10 #1 / 15  # based on plot 4 in HGCN paper
+        self.curvature = args['poincare_ball_curvature']  # 0.03 0.5 #1/10 #1 / 15  # based on plot 4 in HGCN paper
         self.output_dir = args['output_dir']
 
         self.output_image_dir = os.path.join(self.output_dir, 'images')
@@ -451,7 +451,7 @@ class HyperboloidKmeansSampling(Strategy):
     def __init__(self, X, Y, idxs_lb, net, handler, args):
         super(HyperboloidKmeansSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
         self.manifold = Hyperboloid()
-        self.curvature = 1 / 15  # based on plot 4 in HGCN paper
+        self.curvature = args['poincare_ball_curvature']  # based on plot 4 in HGCN paper
         self.output_dir = args['output_dir']
         # self.output_image_dir = os.path.join(self.output_dir,'images')
         self.output_sample_dir = os.path.join(self.output_dir, 'samples')
@@ -605,7 +605,7 @@ class UmapPoincareKmeansSampling(Strategy):
     def __init__(self, X, Y, idxs_lb, net, handler, args):
         super(UmapPoincareKmeansSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
         self.manifold = PoincareBall()
-        self.curvature = 1 / 15  # based on plot 4 in HGCN paper
+        self.curvature = args['poincare_ball_curvature']  # based on plot 4 in HGCN paper
         self.output_dir = args['output_dir']
         self.output_image_dir = os.path.join(self.output_dir, 'images')
         self.output_sample_dir = os.path.join(self.output_dir, 'samples')
@@ -719,7 +719,7 @@ class UmapHyperboloidKmeansSampling(Strategy):
     def __init__(self, X, Y, idxs_lb, net, handler, args):
         super(UmapHyperboloidKmeansSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
         self.manifold = Hyperboloid()
-        self.curvature = 1 / 15  # based on plot 4 in HGCN paper
+        self.curvature = args['poincare_ball_curvature']  # based on plot 4 in HGCN paper
         self.output_dir = args['output_dir']
         self.output_image_dir = os.path.join(self.output_dir, 'images')
         self.output_sample_dir = os.path.join(self.output_dir, 'samples')
@@ -847,7 +847,7 @@ class UmapHyperboloidKmeansSampling2(Strategy):
     def __init__(self, X, Y, idxs_lb, net, handler, args):
         super(UmapHyperboloidKmeansSampling2, self).__init__(X, Y, idxs_lb, net, handler, args)
         self.manifold = Hyperboloid()
-        self.curvature = 1 / 15  # based on plot 4 in HGCN paper
+        self.curvature = args['poincare_ball_curvature']  # based on plot 4 in HGCN paper
         self.output_dir = args['output_dir']
         self.output_image_dir = os.path.join(self.output_dir, 'images')
         self.output_sample_dir = os.path.join(self.output_dir, 'samples')
@@ -950,7 +950,7 @@ class HypUmapSampling(Strategy):
     def __init__(self, X, Y, idxs_lb, net, handler, args):
         super(HypUmapSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
         self.manifold = Hyperboloid()
-        self.curvature = 1 / 15  # based on plot 4 in HGCN paper
+        self.curvature = args['poincare_ball_curvature']  # based on plot 4 in HGCN paper
         self.output_dir = args['output_dir']
         self.output_image_dir = os.path.join(self.output_dir, 'images')
         self.output_sample_dir = os.path.join(self.output_dir, 'samples')
@@ -1467,7 +1467,7 @@ class BadgePoincareSampling(Strategy):
     def __init__(self, X, Y, idxs_lb, net, handler, args):
         super(BadgePoincareSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
         self.manifold = PoincareBall()
-        self.curvature = 1 / 15  # based on plot 4 in HGCN paper
+        self.curvature = args['poincare_ball_curvature']  # based on plot 4 in HGCN paper
         self.output_dir = args['output_dir']
         self.output_sample_dir = os.path.join(self.output_dir, 'samples')
         create_directory(self.output_sample_dir)
@@ -1539,7 +1539,7 @@ class BadgePoincareSampling(Strategy):
 #     def __init__(self, X, Y, idxs_lb, net, handler, args):
 #         super(BadgePoincareSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
 #         self.manifold = PoincareBall()
-#         self.curvature = 1 / 15  # based on plot 4 in HGCN paper
+#         self.curvature = args['poincare_ball_curvature']  # based on plot 4 in HGCN paper
 #         self.output_dir = args['output_dir']
 #         self.output_sample_dir = os.path.join(self.output_dir, 'samples')
 #         create_directory(self.output_sample_dir)

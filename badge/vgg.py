@@ -1,8 +1,10 @@
 '''VGG11/13/16/19 in Pytorch.'''
+import sys
+
 import torch
 import torch.nn as nn
 
-## From badge implementation
+# ## From badge implementation
 cfg = {
     'VGG11': [64, 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
     'VGG13': [64, 64, 'M', 128, 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
@@ -10,16 +12,74 @@ cfg = {
     'VGG19': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 256, 'M', 512, 512, 512, 512, 'M', 512, 512, 512, 512, 'M'],
 }
 
+class VGG_from_VAAL(nn.Module):
+    def __init__(self, vgg_name, num_classes):
+        super(VGG_from_VAAL, self).__init__()
+        self.features = self._make_layers(cfg[vgg_name])
+        self.avgpool = nn.AdaptiveAvgPool2d((2, 2))
+        self.classifier = nn.Sequential(
+            nn.Linear(512 * 2 * 2, 1024),
+            nn.ReLU(True),
+            # nn.Dropout(),
+            nn.Linear(1024, 512),
+            nn.ReLU(True),
+            # nn.Dropout(),
+            # nn.Linear(4096, num_classes)
+        )
+        self.final_layer = nn.Linear(512, num_classes)
+
+    def forward(self, x):
+        print(x.size())
+        out = self.features(x)
+        out = self.avgpool(out)
+        out = torch.flatten(out, 1)
+        # emb = out.view(out.size(0), -1)
+        emb = self.classifier(out)
+        out = self.final_layer(emb)
+
+        return out, emb
+
+    def _make_layers(self, cfg):
+        layers = []
+        in_channels = 3
+        for x in cfg:
+            if x == 'M':
+                layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
+            else:
+                layers += [nn.Conv2d(in_channels, x, kernel_size=3, padding=1),
+                           nn.BatchNorm2d(x),
+                           nn.ReLU(inplace=True)]
+                in_channels = x
+        layers += [nn.AvgPool2d(kernel_size=1, stride=1)]
+        return nn.Sequential(*layers)
+
+    def get_embedding_dim(self):
+        return 512
 
 class VGG(nn.Module):
-    def __init__(self, vgg_name, num_classes):
+    def __init__(self, vgg_name, dataset, num_classes):
         super(VGG, self).__init__()
         self.features = self._make_layers(cfg[vgg_name])
-        self.classifier = nn.Linear(512, num_classes)
+        self.dataset = dataset
+        if dataset=='CUB' or dataset=='CalTech256':
+            self.linear1 = nn.Linear(25088, 1024)
+            self.linear2 = nn.Linear(1024, 512)
+            self.classifier = nn.Linear(512, num_classes)
+        elif dataset=='CIFAR100' or dataset=='CIFAR10':
+            self.classifier = nn.Linear(512, num_classes)
+
 
     def forward(self, x):
         out = self.features(x)
-        emb = out.view(out.size(0), -1)
+        print(x.size())
+        print(out.size())
+        if self.dataset=='CUB' or self.dataset=='CalTech256':
+            out = self.linear1(out.view(out.size(0), -1))
+            emb = self.linear2(out)
+        elif self.dataset=='CIFAR100' or self.dataset=='CIFAR10':
+            emb = out.view(out.size(0), -1)
+        else:
+            sys.exit('dataset not define in the model')
         out = self.classifier(emb)
         return out, emb
 
@@ -56,6 +116,7 @@ class VGG(nn.Module):
 #     'vgg19_bn', 'vgg19',
 # ]
 #
+# from torch.hub import load_state_dict_from_url
 #
 # model_urls = {
 #     'vgg11': 'https://download.pytorch.org/models/vgg11-bbd30ac9.pth',
@@ -82,17 +143,20 @@ class VGG(nn.Module):
 #             nn.Linear(4096, 4096),
 #             nn.ReLU(True),
 #             nn.Dropout(),
-#             nn.Linear(4096, num_classes),
+#             # nn.Linear(4096, num_classes)
 #         )
+#         self.final_layer = nn.Linear(4096, num_classes)
 #         if init_weights:
 #             self._initialize_weights()
 #
 #     def forward(self, x):
-#         x = self.features(x)
-#         x = self.avgpool(x)
-#         emb = torch.flatten(x, 1)
-#         x = self.classifier(emb)
-#         return x, emb
+#         out = self.features(x)
+#         out = self.avgpool(out)
+#         out = torch.flatten(out, 1)
+#         emb = self.classifier(out)
+#         # emb = torch.flatten(out, 1)
+#         # out = self.classifier(out)
+#         return out, emb
 #
 #     def _initialize_weights(self):
 #         for m in self.modules():
@@ -125,7 +189,7 @@ class VGG(nn.Module):
 #             in_channels = v
 #     return nn.Sequential(*layers)
 #
-#
+
 # cfgs = {
 #     'A': [64, 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
 #     'B': [64, 64, 'M', 128, 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],

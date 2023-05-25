@@ -17,7 +17,7 @@ from query_strategies.hyperbolic_embedding_umap_sampling import HypUmapSampling,
     HyperboloidKmeansSampling, PoincareKmeansSampling, HypNetNormSampling, UmapKmeansSampling, BadgePoincareSampling, \
     MEALSampling, PoincareKmeansUncertaintySampling, HypNetBadgePoincareKmeansSampling, \
     HypNetEmbeddingPoincareKmeansSampling, HyperNorm_plus_RiemannianBadge_Sampling
-from dataset import get_dataset, get_handler
+from dataset import get_dataset, get_handler, cifar10_transformer, caltech256_transformer
 # from model import get_net
 from model import HyperNet, Net0, Net00, mlpMod, linMod, HyperNet2, HyperNet3, HyperResNet50
 import vgg
@@ -114,18 +114,18 @@ args_pool = {'MNIST':
             'CIFAR100':
                  {'n_epoch': 3,
                   'max_epoch': 100,
-                  'transform': transforms.Compose([
-                      transforms.RandomCrop(32, padding=4),
-                      transforms.RandomHorizontalFlip(),
-                      transforms.ToTensor(),
-                      transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
-                  ]),
+                  'transform': cifar10_transformer(mode='train'),
                   'loader_tr_args': {'batch_size': 64, 'num_workers': 1},
                   'loader_te_args': {'batch_size': 1000, 'num_workers': 1},
                   'optimizer_args': {'lr': 0.05, 'momentum': 0.3},
-                  'transformTest': transforms.Compose([transforms.ToTensor(),
-                                                       transforms.Normalize((0.4914, 0.4822, 0.4465),
-                                                                            (0.2470, 0.2435, 0.2616))])},
+                  'transformTest': cifar10_transformer(mode='test')},
+            'CalTech256':
+                 {'max_epoch': 100,
+                  'transform': caltech256_transformer(mode='train'),
+                  'loader_tr_args': {'batch_size': 64, 'num_workers': 1},
+                  'loader_te_args': {'batch_size': 1000, 'num_workers': 1},
+                  'optimizer_args': {'lr': 0.05, 'momentum': 0.3},
+                  'transformTest':caltech256_transformer(mode='test')},
             #  'CUB':
             #      {'n_epoch': 3,
             #       'max_epoch': 300,
@@ -175,9 +175,9 @@ elif DATA_NAME=='CIFAR100':
     opts.nStart = 5000 #initial_budget based on VAAL paper
     opts.lr = 5e-4 #learning rate based on VAAL paper
 
-elif DATA_NAME == 'CAL256':
+elif DATA_NAME == 'CalTech256':
     opts.nClasses = 256
-    opts.nQuery = 500
+    opts.nQuery = 1530
 
 if opts.model == 'swin_t':
     args_pool['max_epoch'] = 200
@@ -291,13 +291,13 @@ idxs_lb[idxs_tmp[:NUM_INIT_LB]] = True
 
 
 if opts.model == 'net00':
-    EXPERIMENT_NAME = DATA_NAME + '_' + opts.model +'_embDim20_curvature-03' + '_' + opts.alg + '_' + str(NUM_QUERY)
+    EXPERIMENT_NAME = DATA_NAME + '_' + opts.model +'_embDim20_' + '_' + opts.alg + '_' + str(NUM_QUERY)
 elif 'HyperNet' in opts.model:
     EXPERIMENT_NAME = DATA_NAME + '_' + opts.model + opts.alg + '_' + str(NUM_QUERY) \
                     +'_balldim{}_c{}'.format(args['poincare_ball_dim'], args['poincare_ball_curvature']) \
                     +'clipr' # + '_newlossonly_batchsize250'
 else:
-    EXPERIMENT_NAME = DATA_NAME + '_' + opts.model + '_' + opts.alg + '_' + str(NUM_QUERY)
+    EXPERIMENT_NAME = DATA_NAME + '_' + opts.model + '_' + opts.alg + '_' + str(NUM_QUERY) #+ '_dum'
 
 print('EXPERIMENT_NAME={}'.format(EXPERIMENT_NAME))
 
@@ -310,9 +310,11 @@ elif opts.model == 'resnet':
     net = resnet.ResNet18(num_classes=opts.nClasses)
 elif opts.model == 'resnet50':
     net = resnet.ResNet50(dataset=DATA_NAME, num_classes=opts.nClasses)
-elif opts.model == 'vgg':
-    # net = vgg.vgg16_bn(num_classes=opts.nClasses, pretrained=False) # from VAAL but does not train well and don't know why
-    net = vgg.VGG('VGG16', num_classes=opts.nClasses)
+elif opts.model == 'vgg_simple':
+    net = vgg.VGG('VGG16', dataset=DATA_NAME, num_classes=opts.nClasses)
+elif opts.model == 'vgg_VAAL':
+    # net = vgg.vgg16_bn(num_classes=opts.nClasses) # from VAAL but does not train well and don't know why
+    net = vgg.VGG_from_VAAL('VGG16', num_classes=opts.nClasses)
 elif opts.model == 'lin':
     dim = np.prod(list(X_tr.shape[1:]))
     net = linMod(dim=int(dim))
