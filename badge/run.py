@@ -147,6 +147,10 @@ if DATA_NAME in ['MNIST', 'CIFAR10']:
     opts.nStart = 100
     opts.nQuery = 100
     rounds_to_40p = 9
+    ## mnist use 100 to  match ALFeafix plot
+    opts.nStart = 100
+    opts.nQuery = 100
+    rounds_to_40p = 9
 elif DATA_NAME=='CUB':
     opts.nClasses = 200
     opts.nQuery = 500
