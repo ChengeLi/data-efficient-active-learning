@@ -1,3 +1,4 @@
+import copy
 import math
 import os
 import random
@@ -144,22 +145,31 @@ class MEALSampling(Strategy):
         idxs_unlabeled = np.arange(self.n_pool)[~self.idxs_lb]
         prob = self.predict_prob(self.X[idxs_unlabeled], self.Y[idxs_unlabeled])
         entropy_scores = entropy_score(prob)
-        chosen_uncertainty = np.argsort(entropy_scores)[::-1][0:n_uncertainty]
-        dummy = [True] * len(idxs_unlabeled)
-        for p in chosen_uncertainty:
-            dummy[p] = False
-        idxs_unlabeled_forUMAP = idxs_unlabeled[dummy]
+        dumdum = dict(zip(np.argsort(entropy_scores), idxs_unlabeled))
+        chosen_uncertainty_dum = np.argsort(entropy_scores)[-n_uncertainty:]
+        chosen_uncertainty = []
+        for p in chosen_uncertainty_dum:
+            chosen_uncertainty.append(dumdum[p])
+            dumdum.pop(p)
+
+        idxs_unlabeled_forUMAP = np.fromiter(dumdum.values(), dtype=int)  # idxs_unlabeled[dummy]
+        # chosen_uncertainty = np.argsort(entropy_scores)[::-1][0:n_uncertainty]
+        # dummy = [True] * len(idxs_unlabeled)
+        # for p in chosen_uncertainty:
+        #     dummy[p] = False
+        # idxs_unlabeled_forUMAP = idxs_unlabeled[dummy]
         chosen_diversity = self.init_centers(standard_embedding[idxs_unlabeled_forUMAP], n_diversity)
-        chosen = list(set(chosen_uncertainty.tolist()).union(set(chosen_diversity)))
+        chosen = list(set(chosen_uncertainty).union(set(idxs_unlabeled_forUMAP[chosen_diversity]))) # this is the actual chosen idxs_unlabeled, not the index for them like other strategies
+
         header_ = ['label', 'index']
         df = pd.DataFrame(np.concatenate(
-            [np.expand_dims((self.Y[idxs_unlabeled[chosen]]).numpy(), axis=1),
-             np.expand_dims(idxs_unlabeled[chosen], axis=1)], axis=1),
+            [np.expand_dims((self.Y[chosen]).numpy(), axis=1),
+             np.expand_dims(chosen, axis=1)], axis=1),
             columns=header_)
         df.to_csv(selected_sample_name, index=False)
 
         del standard_embedding, df
-        return idxs_unlabeled[chosen]
+        return chosen
 
 
 class PoincareKmeansSampling(Strategy):  # HEAl1
@@ -274,7 +284,6 @@ class PoincareKmeansUncertaintySampling(Strategy):  # HEAl2
         return indsAll
 
     def query(self, n):
-
         if len(os.listdir(self.output_sample_dir)) != 0:
             name = int(sorted(os.listdir(self.output_sample_dir))[-1][4:-4]) + 1
             selected_sample_name = os.path.join(self.output_sample_dir, "chosen_{:05d}.csv".format(name))
@@ -296,32 +305,37 @@ class PoincareKmeansUncertaintySampling(Strategy):  # HEAl2
         del embedding
         # find minimum norm
         idxs_unlabeled = np.arange(self.n_pool)[~self.idxs_lb]
+        # dummy_idxs_unlabeled = copy.deepcopy(list(np.arange(self.n_pool)[~self.idxs_lb]))
         # choosing uncertainty based on norm
         # all_emb_norm = self.manifold.norm(all_emb, self.curvature)[idxs_unlabeled]
         # chosen_uncertainty = np.argsort(all_emb_norm)[0:n_uncertainty]
         # choosing uncertainty based on entropy
         prob = self.predict_prob(self.X[idxs_unlabeled], self.Y[idxs_unlabeled])
         entropy_scores = entropy_score(prob)
-        chosen_uncertainty = np.argsort(entropy_scores)[::-1][0:n_uncertainty]
+        dumdum = dict(zip(np.argsort(entropy_scores), idxs_unlabeled))
+        chosen_uncertainty_dum = np.argsort(entropy_scores)[-n_uncertainty:]
+
         # fit unsupervised clusters and plot results
         print('Running Hyperbolic Kmean++ in Poincare Ball space ...')
-        dummy = [True] * len(idxs_unlabeled)
-        for p in chosen_uncertainty:
-            dummy[p] = False
-        idxs_unlabeled_forKmeans = idxs_unlabeled[dummy]
+        chosen_uncertainty = []
+        for p in chosen_uncertainty_dum:
+            chosen_uncertainty.append(dumdum[p])
+            dumdum.pop(p)
+
+        idxs_unlabeled_forKmeans = np.fromiter(dumdum.values(), dtype=int) #idxs_unlabeled[dummy]
         chosen_diversity = self.init_centers_hyp(all_emb[idxs_unlabeled_forKmeans], n_diversity)
-        chosen = list(set(chosen_uncertainty.tolist()).union(set(chosen_diversity)))
+        chosen = list(set(chosen_uncertainty).union(set(idxs_unlabeled_forKmeans[chosen_diversity]))) # this is the actual chosen idxs_unlabeled, not the index for them like other strategies
 
         del all_emb
         header_ = ['label', 'index']
         df = pd.DataFrame(np.concatenate(
-            [np.expand_dims((self.Y[idxs_unlabeled[chosen]]).numpy(), axis=1),
-             np.expand_dims(idxs_unlabeled[chosen], axis=1)], axis=1),
+            [np.expand_dims((self.Y[chosen]).numpy(), axis=1),
+             np.expand_dims(chosen, axis=1)], axis=1),
             columns=header_)
         df.to_csv(selected_sample_name, index=False)
 
         del df
-        return idxs_unlabeled[chosen]
+        return chosen
 
 
 class PoincareKmeansSamplingNew(Strategy):

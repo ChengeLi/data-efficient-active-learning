@@ -105,19 +105,19 @@ args_pool = {'MNIST':
                   'optimizer_args': {'lr': 0.05, 'momentum': 0.3},
                   'transformTest': cifar10_transformer(mode='test')},
             'CIFAR100':
-                 {'n_epoch': 3,
+                 {#'n_epoch': 3,
                   'max_epoch': 100,
                   'transform': cifar10_transformer(mode='train'),
                   'loader_tr_args': {'batch_size': 128, 'num_workers': 1},
                   'loader_te_args': {'batch_size': 1000, 'num_workers': 1},
-                  'optimizer_args': {'lr': 0.05, 'momentum': 0.3},
+                  'optimizer_args': {'lr': 5e-4, 'momentum': 0.3},
                   'transformTest': cifar10_transformer(mode='test')},
             'CalTech256':
-                 {'max_epoch': 200,
+                 {'max_epoch': 100,
                   'transform': caltech256_transformer(mode='train'),
                   'loader_tr_args': {'batch_size': 64, 'num_workers': 1},
                   'loader_te_args': {'batch_size': 64, 'num_workers': 1},
-                  'optimizer_args': {'lr': 0.05, 'momentum': 0.3},
+                  'optimizer_args': {'lr': 5e-4, 'momentum': 0.3},
                   'transformTest':caltech256_transformer(mode='test')},
             #  'CUB':
             #      {'n_epoch': 3,
@@ -167,12 +167,14 @@ elif DATA_NAME=='CIFAR100':
     opts.nQuery = 2500
     opts.nStart = 5000 #initial_budget based on VAAL paper
     opts.lr = 5e-4 #learning rate based on VAAL paper
+    rounds_to_40p = 6
 
 elif DATA_NAME == 'CalTech256':
     opts.nClasses = 256
-    opts.nQuery = 1530 #initial_budget based on VAAL paper
-    opts.nStart = int(1530*2)  # initial_budget based on VAAL paper
+    opts.nQuery = 1192 #1530 #AL batch_budget based on VAAL paper
+    opts.nStart = int(opts.nQuery*2)  # initial_budget based on VAAL paper
     opts.lr = 5e-4  # learning rate based on VAAL paper
+    rounds_to_40p = 6
 
 if opts.model == 'swin_t':
     args_pool['max_epoch'] = 200
@@ -286,13 +288,13 @@ idxs_lb[idxs_tmp[:NUM_INIT_LB]] = True
 
 
 if opts.model == 'net00':
-    EXPERIMENT_NAME = DATA_NAME + '_' + opts.model +'_embDim20_' + opts.alg + '_' + str(NUM_QUERY)
+    EXPERIMENT_NAME = DATA_NAME + '_' + opts.model +'_embDim20_' + opts.alg + '_' + str(NUM_QUERY) + '_dum'
 elif 'HyperNet' in opts.model:
     EXPERIMENT_NAME = DATA_NAME + '_' + opts.model + opts.alg + '_' + str(NUM_QUERY) \
                     +'_balldim{}_c{}'.format(args['poincare_ball_dim'], args['poincare_ball_curvature']) \
                     +'clipr' # + '_newlossonly_batchsize250'
 else:
-    EXPERIMENT_NAME = DATA_NAME + '_' + opts.model + '_' + opts.alg + '_' + str(NUM_QUERY) #+ '_dum'
+    EXPERIMENT_NAME = DATA_NAME + '_' + opts.model + '_' + opts.alg + '_' + str(NUM_QUERY) + '_dum'
 
 print('EXPERIMENT_NAME={}'.format(EXPERIMENT_NAME))
 
@@ -419,7 +421,7 @@ acc[0] = 1.0 * (Y_te == P).sum().item() / len(Y_te)
 print(str(opts.nStart) + '\ttesting accuracy {}'.format(acc[0]), flush=True)
 results.append([sum(idxs_lb), acc[0]])
 
-for rd in tqdm(range(1, NUM_ROUND + 1)):
+for rd in tqdm(range(1, rounds_to_40p + 1)):
     print('')
     print('Round {}'.format(rd), flush=True)
     torch.cuda.empty_cache()
