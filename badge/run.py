@@ -158,7 +158,9 @@ args_pool = {'MNIST':
              }
 if DATA_NAME in ['MNIST', 'CIFAR10']:
     opts.nClasses = 10
-    opts.nQuery = 500
+    opts.nStart = 100
+    opts.nQuery = 100
+    rounds_to_40p = 9
 elif DATA_NAME=='CUB':
     opts.nClasses = 200
     opts.nQuery = 500
