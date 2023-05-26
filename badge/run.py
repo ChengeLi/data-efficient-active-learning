@@ -105,9 +105,9 @@ args_pool = {'MNIST':
                   'optimizer_args': {'lr': 0.05, 'momentum': 0.3},
                   'transformTest': cifar10_transformer(mode='test')},
             'CIFAR100':
-                 {'dataset': 'CIFAR100',
+                 {#'n_epoch': 3,
+                 'dataset': 'CIFAR100',
                  'model': opts.model,
-                 # 'n_epoch': 3,
                   'max_epoch': 100,
                   'transform': cifar10_transformer(mode='train'),
                   'loader_tr_args': {'batch_size': 128, 'num_workers': 1},
@@ -115,9 +115,9 @@ args_pool = {'MNIST':
                   'optimizer_args': {'lr': 5e-4, 'momentum': 0.3},
                   'transformTest': cifar10_transformer(mode='test')},
             'CalTech256':
-                 {'max_epoch': 100,
-                 'dataset': 'CalTech256',
+                 {'dataset': 'CalTech256',
                   'model': opts.model,
+                  'max_epoch': 100,
                   'transform': caltech256_transformer(mode='train'),
                   'loader_tr_args': {'batch_size': 64, 'num_workers': 1},
                   'loader_te_args': {'batch_size': 64, 'num_workers': 1},
