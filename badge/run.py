@@ -77,7 +77,7 @@ args_pool = {'MNIST':
                  {'n_epoch': 10,
                   'max_epoch': 100,
                   'transform': transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]),
-                  'loader_tr_args': {'batch_size': 256, 'num_workers': 0},
+                  'loader_tr_args': {'batch_size': 16, 'num_workers': 0},
                   'loader_te_args': {'batch_size': 1000, 'num_workers': 0},
                   'optimizer_args': {'lr': 0.01, 'momentum': 0.5}},
              'FashionMNIST':
@@ -100,7 +100,7 @@ args_pool = {'MNIST':
                  {'n_epoch': 3,
                   'max_epoch': 100,
                   'transform': cifar10_transformer(mode='train'),
-                  'loader_tr_args': {'batch_size': 128, 'num_workers': 1},
+                  'loader_tr_args': {'batch_size': 16, 'num_workers': 1},
                   'loader_te_args': {'batch_size': 1000, 'num_workers': 1},
                   'optimizer_args': {'lr': 0.05, 'momentum': 0.3},
                   'transformTest': cifar10_transformer(mode='test')},
