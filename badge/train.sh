@@ -1,5 +1,6 @@
-nquery=500
-dataset=CUB #CUB #CIFAR10 #MNIST #
+nquery=300
+nstart=6000
+dataset=CIFAR100 #CUB #MNIST #
 python3 run.py \
 --nQuery $nquery \
 --data $dataset \

@@ -148,8 +148,6 @@ if DATA_NAME in ['MNIST', 'CIFAR10']:
     opts.nQuery = 100
     rounds_to_40p = 9
     ## mnist use 100 to  match ALFeafix plot
-
-
 elif DATA_NAME=='CUB':
     opts.nClasses = 200
     opts.nQuery = 300
@@ -233,7 +231,8 @@ if opts.did > 0:
  # load non-openml dataset
 else:
     if DATA_NAME=='CUB':
-        cub_root = '/home/ubuntu/workplace/code/data-efficient-active-learning/data/CUB_200_2011/224/'#'/workplace/ICCV_AL/data-efficient-active-learning/badge/data/CUB_200_2011/224/'
+        # cub_root = '/home/ubuntu/workplace/code/data-efficient-active-learning/data/CUB_200_2011/224/'
+        cub_root = '/workplace/ICCV_AL/data-efficient-active-learning/badge/data/CUB_200_2011/224/'
         X_tr, Y_tr, X_te, Y_te = torch.tensor(np.load(cub_root+'X_tr.npy')), torch.tensor(np.load(cub_root+'Y_tr.npy')), torch.tensor(np.load(cub_root+'X_te.npy')), torch.tensor(np.load(cub_root+'Y_te.npy'))
     else:
         X_tr, Y_tr, X_te, Y_te = get_dataset(DATA_NAME, opts.path, args_pool[DATA_NAME])
@@ -333,15 +332,7 @@ elif opts.model == 'net00':
 elif opts.model in ['deit_small_distilled_patch16_224', 'vit_small_patch16_224', 'dino_vits16']:
     # model name from timm or torch.hub, i.e. deit_small_distilled_patch16_224, vit_small_patch16_224, dino_vits16
     from vit_model import VIT, HYPER_VIT
-    # if opts.model.startswith("vit"):
-    #     mean_std = (0.5, 0.5, 0.5), (0.5, 0.5, 0.5)
-    # else:
-    #     mean_std = (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)
     net = VIT(args)
-    # from apex import amp
-    # from apex.parallel import DistributedDataParallel
-    # net = DistributedDataParallel(net, delay_allreduce=True)
-
 else:
     print('choose a valid model - mlp, resnet, or vgg', flush=True)
     raise ValueError
@@ -426,6 +417,13 @@ acc[0] = 1.0 * (Y_te == P).sum().item() / len(Y_te)
 print(str(opts.nStart) + '\ttesting accuracy {}'.format(acc[0]), flush=True)
 results.append([sum(idxs_lb), acc[0]])
 
+
+### sanity check
+P = strategy.predict(X_tr, Y_tr)
+acc_tr = 1.0 * (Y_tr == P).sum().item() / len(Y_tr)
+print('\t sanity check: training accuracy {}'.format(acc_tr), flush=True)
+
+# for rd in tqdm(range(1, NUM_ROUND + 1)):
 for rd in tqdm(range(1, rounds_to_40p + 1)):
     print('')
     print('Round {}'.format(rd), flush=True)
