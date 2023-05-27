@@ -105,7 +105,9 @@ args_pool = {'MNIST':
                   'optimizer_args': {'lr': 0.05, 'momentum': 0.3},
                   'transformTest': cifar10_transformer(mode='test')},
             'CIFAR100':
-                 {#'n_epoch': 3,
+                 {'dataset': 'CIFAR100',
+                 'model': opts.model,
+                 # 'n_epoch': 3,
                   'max_epoch': 100,
                   'transform': cifar10_transformer(mode='train'),
                   'loader_tr_args': {'batch_size': 128, 'num_workers': 1},
@@ -114,33 +116,17 @@ args_pool = {'MNIST':
                   'transformTest': cifar10_transformer(mode='test')},
             'CalTech256':
                  {'max_epoch': 100,
+                 'dataset': 'CalTech256',
+                  'model': opts.model,
                   'transform': caltech256_transformer(mode='train'),
                   'loader_tr_args': {'batch_size': 64, 'num_workers': 1},
                   'loader_te_args': {'batch_size': 64, 'num_workers': 1},
                   'optimizer_args': {'lr': 5e-4, 'momentum': 0.3},
                   'transformTest':caltech256_transformer(mode='test')},
-            #  'CUB':
-            #      {'n_epoch': 3,
-            #       'max_epoch': 300,
-            #       'transform': transforms.Compose(
-            #     [
-            #         transforms.RandomResizedCrop(84),
-            #         ImageJitter(dict(Brightness=0.4, Contrast=0.4, Color=0.4)),
-            #         transforms.RandomHorizontalFlip(),
-            #         transforms.ToTensor(),
-            #         transforms.Normalize(
-            #             np.array([0.485, 0.456, 0.406]), np.array([0.229, 0.224, 0.225])
-            #         ),
-            #     ]
-            # ),
-            #       'loader_tr_args': {'batch_size': 64, 'num_workers': 1},
-            #       'loader_te_args': {'batch_size': 1000, 'num_workers': 1},
-            #       'optimizer_args': {'lr': 0.01, 'momentum': 0.3},
-            #       'transformTest': transforms.Compose([transforms.ToTensor(),
-            #                                            transforms.Normalize((0.4914, 0.4822, 0.4465),
-            #                                                                 (0.2470, 0.2435, 0.2616))])},
             'CUB':
-                 {'n_epoch': 3,
+                 {'dataset': 'CUB',
+                  'model': opts.model,
+                  'n_epoch': 3,
                   'max_epoch': 100,
                   'transform': transforms.Compose([
                      transforms.RandomResizedCrop(224, scale=(0.2, 1.0), interpolation=PIL.Image.BICUBIC),
@@ -231,21 +217,18 @@ if opts.did > 0:
 
     args = {'transform': transforms.Compose([transforms.ToTensor()]),
             'n_epoch': 10,
-            'loader_tr_args': {'batch_size': 128, 'num_workers': 1},
-            'loader_te_args': {'batch_size': 1000, 'num_workers': 1},
+            'loader_tr_args': {'batch_size': 32, 'num_workers': 0},
+            'loader_te_args': {'batch_size': 1000, 'num_workers': 0},
             'optimizer_args': {'lr': 0.01, 'momentum': 0},
             'transformTest': transforms.Compose([transforms.ToTensor()])}
     handler = get_handler('other')
-# elif DATA_NAME=='CUB' and opts.model=='HyperNet':
-#     pass
-
-# load non-openml dataset
+ # load non-openml dataset
 else:
     if DATA_NAME=='CUB':
-      cub_root = '/workplace/ICCV_AL/data-efficient-active-learning/badge/data/CUB_200_2011/224/'
-      X_tr, Y_tr, X_te, Y_te = torch.tensor(np.load(cub_root+'X_tr.npy')), torch.tensor(np.load(cub_root+'Y_tr.npy')), torch.tensor(np.load(cub_root+'X_te.npy')), torch.tensor(np.load(cub_root+'Y_te.npy'))
+        cub_root = '/workplace/ICCV_AL/data-efficient-active-learning/badge/data/CUB_200_2011/224/'
+        X_tr, Y_tr, X_te, Y_te = torch.tensor(np.load(cub_root+'X_tr.npy')), torch.tensor(np.load(cub_root+'Y_tr.npy')), torch.tensor(np.load(cub_root+'X_te.npy')), torch.tensor(np.load(cub_root+'Y_te.npy'))
     else:
-      X_tr, Y_tr, X_te, Y_te = get_dataset(DATA_NAME, opts.path, args_pool[DATA_NAME])
+        X_tr, Y_tr, X_te, Y_te = get_dataset(DATA_NAME, opts.path, args_pool[DATA_NAME])
     opts.dim = np.shape(X_tr)[1:]
     handler = get_handler(opts.data)
 
@@ -258,7 +241,7 @@ if opts.trunc != -1:
     Y_tr = Y_tr[inds]
     opts.nClasses = int(max(Y_tr) + 1)
 
-args['poincare_ball_curvature'] = 1/15
+args['poincare_ball_curvature'] = 1/15 #hyperVIT is using 0.1
 args['poincare_ball_dim'] = 20
 args['lr'] = opts.lr
 args['modelType'] = opts.model
@@ -294,7 +277,7 @@ if opts.model == 'net00':
 elif 'HyperNet' in opts.model:
     EXPERIMENT_NAME = DATA_NAME + '_' + opts.model + opts.alg + '_' + str(NUM_QUERY) \
                     +'_balldim{}_c{}'.format(args['poincare_ball_dim'], args['poincare_ball_curvature']) \
-                    +'clipr' # + '_newlossonly_batchsize250'
+                    +'clipr'
 else:
     EXPERIMENT_NAME = DATA_NAME + '_' + opts.model + '_' + opts.alg + '_' + str(NUM_QUERY) #+ '_dum'
 
@@ -339,6 +322,18 @@ elif opts.model == 'net0':
 elif opts.model == 'net00':
     print('Using Net00')
     net = Net00(dataset=DATA_NAME)
+elif opts.model in ['deit_small_distilled_patch16_224', 'vit_small_patch16_224', 'dino_vits16']:
+    # model name from timm or torch.hub, i.e. deit_small_distilled_patch16_224, vit_small_patch16_224, dino_vits16
+    from vit_model import VIT, HYPER_VIT
+    # if opts.model.startswith("vit"):
+    #     mean_std = (0.5, 0.5, 0.5), (0.5, 0.5, 0.5)
+    # else:
+    #     mean_std = (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)
+    net = VIT(args)
+    # from apex import amp
+    # from apex.parallel import DistributedDataParallel
+    # net = DistributedDataParallel(net, delay_allreduce=True)
+
 else:
     print('choose a valid model - mlp, resnet, or vgg', flush=True)
     raise ValueError

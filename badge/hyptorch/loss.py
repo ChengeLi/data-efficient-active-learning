@@ -26,11 +26,12 @@ def contrastive_loss(x0, x1, target=None, tau=0.2, hyp_c=1/15, cuda_ind=0):
     logits = torch.cat([logits01, logits00], dim=1)
     logits -= logits.max(1, keepdim=True)[0].detach()
     loss = F.cross_entropy(logits, target)
-    stats = {
-        "logits/min": logits01.min().item(),
-        "logits/mean": logits01.mean().item(),
-        "logits/max": logits01.max().item(),
-        "logits/acc": (logits01.argmax(-1) == target).float().mean().item(),
-    }
-    return loss, stats
+    # stats = {
+    #     "logits/min": logits01.min().item(),
+    #     "logits/mean": logits01.mean().item(),
+    #     "logits/max": logits01.max().item(),
+    #     "logits/acc": (logits01.argmax(-1) == target).float().mean().item(),
+    # }
+    # return loss, stats
+    return loss, None
 

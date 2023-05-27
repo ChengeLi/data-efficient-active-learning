@@ -90,7 +90,8 @@ folders = [
 
 ]
 
-folders = ['MNIST_HyperNethyperNorm_plus_Rbadge_500_balldim20_c0.06666666666666667clipr']
+folders = ['MNIST_HyperNethyperNorm_plus_Rbadge_500_balldim20_c0.06666666666666667clipr',
+'MNIST_HyperNethypNetBadgePoinKmeans_500_balldim20_c0.06666666666666667clipr']
 
 folders = [
 'CIFAR10_HyperNethypNetNorm_500_balldim20_c0.06666666666666667clipr',
@@ -99,13 +100,39 @@ folders = [
 ]
 
 
+folders = ['MNIST_HyperNethypNetNorm_500_balldim20_c0.06666666666666667clipr']
+
+
+folders = ['MNIST_HyperNethypNetBadgePoinKmeans_500_balldim20_c0.06666666666666667clipr2']
+
+folders = [
+ 'CIFAR10_HyperNethypNetNorm_100_balldim20_c0.06666666666666667clipr',
+ 'CIFAR10_HyperNethypNetBadgePoinKmeans_100_balldim20_c0.06666666666666667clipr',
+ 'CIFAR10_HyperNethyperNorm_plus_Rbadge_100_balldim20_c0.06666666666666667clipr',
+
+## ADD THE CLIPPED VERSIONS
+'CIFAR10_HyperNethypNetNorm_500_balldim20_c0.06666666666666667clipr',
+# 'CIFAR10_HyperNethypNetBadgePoinKmeans_500_balldim20_c0.06666666666666667clipr_firstrun',
+'CIFAR10_HyperNethypNetBadgePoinKmeans_500_balldim20_c0.06666666666666667clipr',
+'CIFAR10_HyperNethyperNorm_plus_Rbadge_500_balldim20_c0.06666666666666667clipr',
+
+
+# experiments = [
+# 'CIFAR10_net00_dim20badge_500',
+'CIFAR10_HyperNethypNetNorm_1000_balldim20_c0.06666666666666667clipr',
+'CIFAR10_HyperNethypNetBadgePoinKmeans_1000_balldim20_c0.06666666666666667clipr',
+ 'CIFAR10_HyperNethyperNorm_plus_Rbadge_1000_balldim20_c0.06666666666666667clipr',
+ # 'CIFAR10_HyperNetrand_1000_balldim20_c0.06666666666666667clipr',
+
+
+]
 
 for folder in folders:
 	if not os.path.exists('/Users/lichenge/Downloads/badge_output2/{}'.format(folder)):
 		os.makedirs('/Users/lichenge/Downloads/badge_output2/{}'.format(folder))
 	# os.system('scp -r chenge_p3_new:/workplace/ICCV_AL/data-efficient-active-learning/badge/badge/output/{}/\*.png {}/'.format(folder, folder))
-	# os.system('scp -r chenge_p3_new:/workplace/ICCV_AL/data-efficient-active-learning/badge/badge/output/{}/\*.mp4 {}/'.format(folder, folder))
+	os.system('scp -r chenge_p3_new:/workplace/ICCV_AL/data-efficient-active-learning/badge/badge/output/{}/\*.mp4 {}/'.format(folder, folder))
 	# os.system('scp -r chenge_p3_new:/workplace/ICCV_AL/data-efficient-active-learning/badge/badge/output/{}/\*.txt {}/'.format(folder, folder))
-	os.system('scp -r chenge_p3_new:/workplace/ICCV_AL/data-efficient-active-learning/badge/badge/output/{}/images/ {}/'.format(folder, folder))
+	# os.system('scp -r chenge_p3_new:/workplace/ICCV_AL/data-efficient-active-learning/badge/badge/output/{}/images/ {}/'.format(folder, folder))
 	# os.system('scp -r chenge_p3_new:/workplace/ICCV_AL/data-efficient-active-learning/badge/badge/output/{}/samples/ {}/'.format(folder, folder))
 

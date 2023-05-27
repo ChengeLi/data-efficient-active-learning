@@ -79,8 +79,9 @@ class Strategy:
         accCurrent = 0.
         bestAcc = 0.
         attempts = 0
+        use_multiple_gpu = True
         while epoch < self.args['max_epoch'] and accCurrent < 0.99: #train for max_epoch epoches at most
-            if not isinstance(self.clf, nn.DataParallel):
+            if use_multiple_gpu and not isinstance(self.clf, nn.DataParallel):
                 print('enabling multiple gpus')
                 self.clf = self.enable_multiple_gpu_model(self.clf)
             accCurrent, lossCurrent = self._train(epoch, loader_tr, optimizer)

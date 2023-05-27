@@ -1234,14 +1234,15 @@ class HypNetNormSampling(Strategy):
     #     bestAcc = 0.
     #     attempts = 0
     #     accCurrent = 0
+    #     use_multiple_gpu = False
     #     while epoch < self.args['max_epoch'] and accCurrent < 0.99: #train for max_epoch epoches at most
-    #         if not isinstance(self.clf, nn.DataParallel):
+    #         if use_multiple_gpu and not isinstance(self.clf, nn.DataParallel):
     #             print('enabling multiple gpus')
     #             self.clf = self.enable_multiple_gpu_model(self.clf)
 
     #         self.clf.train()
     #         sampler2.set_epoch(epoch)
-    #         stats_ep = []
+    #         # stats_ep = []
     #         accCurrent = 0.
     #         num_samples_runned = 0
     #         for batch_idx, (x, y, idxs) in enumerate(dl_train2):
@@ -1249,6 +1250,7 @@ class HypNetNormSampling(Strategy):
     #             # print(x[0].mean(), x[1].mean(), x[2].mean(),x[3].mean())
     #             # print(y)
     #             # print('idxs=',idxs)
+    #             # print(y.shape)
     #             x, y = Variable(x.to(torch.device(f"cuda:{cuda_ind}"))), Variable(y.to(torch.device(f"cuda:{cuda_ind}")))
     #             orgional_y = deepcopy(y)
     #             y = y.view(len(y) // num_samples, num_samples)
@@ -1268,11 +1270,11 @@ class HypNetNormSampling(Strategy):
     #             for i in range(num_samples):
     #                 for j in range(num_samples):
     #                     if i != j:
-    #                         l, s = contrastive_loss(z[:, i], z[:, j], target=y,
-    #                                 tau=t, hyp_c=self.args['poincare_ball_curvature'],
+    #                         l, _ = contrastive_loss(z[:, i], z[:, j], target=y,
+    #                                 tau=t, hyp_c=self.args['poincare_ball_curvature'], 
     #                                 cuda_ind=cuda_ind)
     #                         loss += l
-    #                         stats_ep.append({**s, "loss": l.item()})
+    #                         # stats_ep.append({**s, "loss": l.item()})
 
     #             # loss /= num_samples*num_samples-num_samples
     #             # ce_loss = F.cross_entropy(out.to(torch.device(f"cuda:{cuda_ind}")), orgional_y)
