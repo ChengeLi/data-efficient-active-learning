@@ -148,12 +148,16 @@ if DATA_NAME in ['MNIST', 'CIFAR10']:
     opts.nQuery = 100
     rounds_to_40p = 9
     ## mnist use 100 to  match ALFeafix plot
-    opts.nStart = 100
-    opts.nQuery = 100
-    rounds_to_40p = 9
+
+
 elif DATA_NAME=='CUB':
     opts.nClasses = 200
-    opts.nQuery = 500
+    opts.nQuery = 300
+    opts.nStart = int(opts.nQuery*2) #initial_budget
+    rounds_to_40p = 6
+    opts.lr = 5e-4
+    print('lr: ', opts.lr)
+
 elif DATA_NAME=='CIFAR100':
     opts.nClasses = 100
     opts.nQuery = 2500
@@ -229,7 +233,7 @@ if opts.did > 0:
  # load non-openml dataset
 else:
     if DATA_NAME=='CUB':
-        cub_root = '/workplace/ICCV_AL/data-efficient-active-learning/badge/data/CUB_200_2011/224/'
+        cub_root = '/home/ubuntu/workplace/code/data-efficient-active-learning/data/CUB_200_2011/224/'#'/workplace/ICCV_AL/data-efficient-active-learning/badge/data/CUB_200_2011/224/'
         X_tr, Y_tr, X_te, Y_te = torch.tensor(np.load(cub_root+'X_tr.npy')), torch.tensor(np.load(cub_root+'Y_tr.npy')), torch.tensor(np.load(cub_root+'X_te.npy')), torch.tensor(np.load(cub_root+'Y_te.npy'))
     else:
         X_tr, Y_tr, X_te, Y_te = get_dataset(DATA_NAME, opts.path, args_pool[DATA_NAME])
