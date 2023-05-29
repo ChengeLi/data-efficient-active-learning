@@ -13,6 +13,7 @@ class VIT(nn.Module):
         if args["model"].startswith("dino"):
             self.body = torch.hub.load("facebookresearch/dino:main", args["model"])
         else:
+            print(f'getting {args["model"]} form TIMM')
             self.body = timm.create_model(args["model"], pretrained=True)
 
         if args["dataset"]=='CIFAR100':

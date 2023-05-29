@@ -13,13 +13,16 @@ from torchvision import transforms
 
 from cub200_dataset import Cub200
 import pdb
-def cifar10_transformer(mode='train'):
+def cifar10_transformer(mode='train', mean_std=None):
+    if mean_std == None:
+        mean_std = (0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)
     if mode=='train':
         return transforms.Compose([
-            transforms.RandomCrop(32, padding=4),
+            # transforms.RandomCrop(32, padding=4),
+            transforms.Resize(size=224), #for VIT
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
+            transforms.Normalize(*mean_std)
         ])
         # VAAL - did not outperform ours
         # return transforms.Compose([
@@ -30,8 +33,9 @@ def cifar10_transformer(mode='train'):
         #    ])
     elif mode=='test':
         return transforms.Compose([
+            transforms.Resize(size=224), #for VIT
             transforms.ToTensor(),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
+            transforms.Normalize(*mean_std)
         ])
         # VAAL - did not outperform ours
         # return transforms.Compose([

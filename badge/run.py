@@ -56,7 +56,6 @@ parser.add_argument('--trunc', help='dataset truncation (-1 is no truncation)', 
 parser.add_argument('--aug', help='do augmentation (for cifar)', type=int, default=0)
 parser.add_argument('--dummy', help='dummy input for indexing replicates', type=int, default=1)
 opts = parser.parse_args()
-print(opts, flush=True)
 
 torch.manual_seed(10)
 random.seed(10)
@@ -73,6 +72,7 @@ opts.lamb = 1
 visualize_embedding = False
 visualize_learningcurve = True
 # non-openml data defaults
+vit_mean_std = (0.5, 0.5, 0.5), (0.5, 0.5, 0.5)
 args_pool = {'MNIST':
                  {'n_epoch': 10,
                   'max_epoch': 100,
@@ -109,7 +109,7 @@ args_pool = {'MNIST':
                  'dataset': 'CIFAR100',
                  'model': opts.model,
                   'max_epoch': 100,
-                  'transform': cifar10_transformer(mode='train'),
+                  'transform': cifar10_transformer(mode='train', mean_std=vit_mean_std),
                   'loader_tr_args': {'batch_size': 128, 'num_workers': 1},
                   'loader_te_args': {'batch_size': 1000, 'num_workers': 1},
                   'optimizer_args': {'lr': 5e-4, 'momentum': 0.3},
@@ -127,20 +127,22 @@ args_pool = {'MNIST':
                  {'dataset': 'CUB',
                   'model': opts.model,
                   'n_epoch': 3,
-                  'max_epoch': 100,
+                  'max_epoch': 200,
                   'transform': transforms.Compose([
-                     transforms.RandomResizedCrop(224, scale=(0.2, 1.0), interpolation=PIL.Image.BICUBIC),
+                     # transforms.RandomResizedCrop(224, scale=(0.2, 1.0), interpolation=PIL.Image.BICUBIC),
                      transforms.RandomHorizontalFlip(),
                      transforms.ToTensor(),
-                     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
+                     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+                     # transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
                  ]),
                   'size': (224,224),
                   'loader_tr_args': {'batch_size': 64, 'num_workers': 0},
                   'loader_te_args': {'batch_size': 1000, 'num_workers': 0},
-                  'optimizer_args': {'lr': 0.05, 'momentum': 0.3},
+                  'optimizer_args': {'lr': 1e-5, 'momentum': 0.3},
                   'transformTest': transforms.Compose([transforms.ToTensor(),
-                                                       transforms.Normalize((0.4914, 0.4822, 0.4465),
-                                                                            (0.2470, 0.2435, 0.2616))])},
+                                                     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+                                                       # transforms.Normalize((0.4914, 0.4822, 0.4465),(0.2470, 0.2435, 0.2616))
+                                                       ])},
              }
 if DATA_NAME in ['MNIST', 'CIFAR10']:
     opts.nClasses = 10
@@ -153,9 +155,9 @@ elif DATA_NAME=='CUB':
     opts.nQuery = 300
     opts.nStart = int(opts.nQuery*2) #initial_budget
     rounds_to_40p = 6
-    opts.lr = 5e-4
+    # opts.lr = 5e-4
+    opts.lr = args_pool[DATA_NAME]['optimizer_args']['lr']
     print('lr: ', opts.lr)
-
 elif DATA_NAME=='CIFAR100':
     opts.nClasses = 100
     opts.nQuery = 2500
@@ -239,6 +241,7 @@ else:
     opts.dim = np.shape(X_tr)[1:]
     handler = get_handler(opts.data)
 
+print('data size: X_tr.shape={}'.format(X_tr.shape))
 if opts.trunc != -1:
     inds = np.random.permutation(len(X_tr))[:opts.trunc]
     X_tr = X_tr[inds]
@@ -251,6 +254,7 @@ if opts.trunc != -1:
 args['poincare_ball_curvature'] = 1/15 #hyperVIT is using 0.1
 args['poincare_ball_dim'] = 20
 args['lr'] = opts.lr
+print('learning rate={}'.format(args['lr']))
 args['modelType'] = opts.model
 args['lamb'] = opts.lamb
 if 'CIFAR' in opts.data: args['lamb'] = 1e-2
@@ -275,8 +279,6 @@ idxs_lb = np.zeros(n_pool, dtype=bool)
 idxs_tmp = np.arange(n_pool)
 np.random.shuffle(idxs_tmp)
 idxs_lb[idxs_tmp[:NUM_INIT_LB]] = True
-
-
 
 
 if opts.model == 'net00':
@@ -343,6 +345,11 @@ if opts.did > 0 and opts.model != 'mlp':
 
 if type(X_tr[0]) is not np.ndarray:
     X_tr = X_tr.numpy()
+
+
+print('opts: ', opts, flush=True)
+print('args', args)
+
 
 # set up the specified sampler
 if opts.alg == 'rand':  # random sampling
@@ -439,7 +446,7 @@ for rd in tqdm(range(1, rounds_to_40p + 1)):
 
     # update
     strategy.update(idxs_lb)
-    strategy.train(verbose=False, model_selection=opts.model)
+    strategy.train(verbose=True, model_selection=opts.model)
     # round accuracy
     P = strategy.predict(X_te, Y_te)
     acc[rd] = 1.0 * (Y_te == P).sum().item() / len(Y_te)

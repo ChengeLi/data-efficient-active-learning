@@ -61,14 +61,17 @@ class Strategy:
 
 
  
-    def train(self, reset=True, optimizer=0, verbose=True, data=[], net=[], model_selection=None):
+    def train(self, reset=False, optimizer=0, verbose=True, data=[], net=[], model_selection=None):
         def weight_reset(m):
             newLayer = deepcopy(m)
             if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
                 m.reset_parameters()
 
         # n_epoch = self.args['n_epoch']
-        if reset: self.clf =  self.net.apply(weight_reset).cuda()
+        if reset:
+            self.clf = self.net.apply(weight_reset).cuda()
+        else:
+            self.clf = self.net.cuda()
         if type(net) != list: self.clf = net
         if type(optimizer) == int: optimizer = optim.Adam(self.clf.parameters(), lr = self.args['lr'], weight_decay=0)
 
@@ -93,7 +96,9 @@ class Strategy:
                 attempts = 0
             else: attempts += 1
             epoch += 1
-            if verbose: print(str(epoch) + '_' + str(attempts) + ' training accuracy: ' + str(np.round(accCurrent,decimals=4)), flush=True)
+            if verbose:
+                print(str(epoch) + '_' + str(attempts) + ' training accuracy: ' + str(np.round(accCurrent,decimals=4)) \
+                        + ' training loss: ' + str(np.round(lossCurrent, decimals=4)), flush=True)
             # reset if not converging
             if (epoch % 1000 == 0) and (accCurrent < 0.2) and (self.args['modelType'] != 'linear'):
                 self.clf = self.net.apply(weight_reset)

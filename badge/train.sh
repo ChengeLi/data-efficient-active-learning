@@ -2,10 +2,12 @@ nquery=300
 nstart=6000
 dataset=CIFAR100 #CUB #MNIST #
 python3 run.py \
---nQuery $nquery \
 --data $dataset \
+--nQuery $nquery \
+--nStart $nstart \
 --model vit_small_patch16_224 \
---alg rand \
+--aug 1 \
+--alg badge \
 
 # --alg hypNetBadgePoinKmeans
 
