@@ -133,6 +133,7 @@ args_pool = {'MNIST':
                  {'dataset': 'CalTech256',
                   'model': opts.model,
                   'max_epoch': 100,
+                    'n_label': 256,
                   'transform': caltech256_transformer(mode='train'),
                   'loader_tr_args': {'batch_size': 64, 'num_workers': 1},
                   'loader_te_args': {'batch_size': 64, 'num_workers': 1},
@@ -177,7 +178,7 @@ elif DATA_NAME=='CIFAR100':
     opts.nClasses = 100
     opts.nQuery = 2500
     opts.nStart = 5000 #initial_budget based on VAAL paper
-    opts.lr = 1e-3 #5e-4 #learning rate based on VAAL paper
+    opts.lr = 5e-4 #5e-4 #learning rate based on VAAL paper
     rounds_to_40p = 6
 
 elif DATA_NAME == 'CalTech256':
