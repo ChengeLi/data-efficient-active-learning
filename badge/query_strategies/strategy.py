@@ -27,8 +27,11 @@ class Strategy:
         self.handler = handler
         self.args = args
         self.n_pool = len(Y)
+        self.query_count = 0
         use_cuda = torch.cuda.is_available()
         print(use_cuda)
+        self.device = torch.device("cuda" if use_cuda else "cpu")
+        self.n_label = args['n_label']
 
     def query(self, n):
         pass
@@ -76,7 +79,9 @@ class Strategy:
         if type(optimizer) == int: optimizer = optim.Adam(self.clf.parameters(), lr = self.args['lr'], weight_decay=0)
 
         idxs_train = np.arange(self.n_pool)[self.idxs_lb]
-        loader_tr = DataLoader(self.handler(self.X[idxs_train], torch.Tensor(self.Y.numpy()[idxs_train]).long(), transform=self.args['transform']), shuffle=True, **self.args['loader_tr_args'])
+        loader_tr = DataLoader(self.handler(self.X[idxs_train], torch.Tensor(self.Y.numpy()[idxs_train]).long(),
+                                transform=self.args['transform']),
+                                shuffle=True, **self.args['loader_tr_args'])
         if len(data) > 0:
             loader_tr = DataLoader(self.handler(data[0], torch.Tensor(data[1]).long(), transform=self.args['transform']), shuffle=True, **self.args['loader_tr_args'])
         # epoch, attempts (early stopping), training accuracy
@@ -263,17 +268,18 @@ class Strategy:
 
     def predict(self, X, Y):
         if type(X) is np.ndarray:
-            loader_te = DataLoader(self.handler(X, Y, transform=self.args['transformTest']),
+            loader_te = DataLoader(self.handler(X, torch.Tensor(Y.numpy()), transform=self.args['transformTest']),
                             shuffle=False, **self.args['loader_te_args'])
         else: 
-            loader_te = DataLoader(self.handler(X.numpy(), Y, transform=self.args['transformTest']),
+            loader_te = DataLoader(self.handler(X.numpy(), torch.Tensor(Y.numpy()), transform=self.args['transformTest']),
                             shuffle=False, **self.args['loader_te_args'])
-
         self.clf.eval()
         P = torch.zeros(len(Y)).long()
         del X, Y
+
         with torch.no_grad():
-            for x, y, idxs in loader_te:
+            for batch_idx, (x, y, idxs) in enumerate(loader_te):
+            # for x, y, idxs in loader_te:
                 x, y = Variable(x.cuda()), Variable(y.cuda())
                 out, e1 = self.clf(x)
                 pred = out.max(1)[1]
@@ -294,6 +300,36 @@ class Strategy:
                 probs[idxs] = out.cpu().data
         
         return probs
+
+    def predict_prob_embed(self, X, Y, eval=True):
+        loader_te = DataLoader(self.handler(X, Y, transform=self.args['transformTest']),
+                               shuffle=False, **self.args['loader_te_args'])
+
+        probs = torch.zeros([len(Y), self.args['n_label']])
+        if isinstance(self.clf, nn.DataParallel):
+            embDim = self.clf.module.get_embedding_dim()
+        else:
+            embDim = self.clf.get_embedding_dim()
+        embeddings = torch.zeros([len(Y), embDim])
+        if eval:
+            self.clf.eval()
+            with torch.no_grad():
+                for x, y, idxs in loader_te:
+                    x, y = x.to(self.device), y.to(self.device)
+                    out, e1 = self.clf(x)
+                    prob = F.softmax(out, dim=1)
+                    probs[idxs] = prob.cpu()
+                    embeddings[idxs] = e1.cpu()
+        else:
+            self.clf.train()
+            for x, y, idxs in loader_te:
+                x, y = x.to(self.device), y.to(self.device)
+                out, e1 = self.clf(x)
+                prob = F.softmax(out, dim=1)
+                probs[idxs] = prob.cpu()
+                embeddings[idxs] = e1.cpu()
+
+        return probs, embeddings
 
     def predict_prob_dropout(self, X, Y, n_drop):
         loader_te = DataLoader(self.handler(X, Y, transform=self.args['transformTest']),

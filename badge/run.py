@@ -17,6 +17,7 @@ from query_strategies.hyperbolic_embedding_umap_sampling import HypUmapSampling,
     HyperboloidKmeansSampling, PoincareKmeansSampling, HypNetNormSampling, UmapKmeansSampling, BadgePoincareSampling, \
     MEALSampling, PoincareKmeansUncertaintySampling, HypNetBadgePoincareKmeansSampling, \
     HypNetEmbeddingPoincareKmeansSampling, HyperNorm_plus_RiemannianBadge_Sampling
+from query_strategies import AlphaMixSampling
 from dataset import get_dataset, get_handler, cifar10_transformer, caltech256_transformer
 # from model import get_net
 from model import HyperNet, Net0, Net00, mlpMod, linMod, HyperNet2, HyperNet3, HyperResNet50
@@ -76,6 +77,10 @@ vit_mean_std = (0.5, 0.5, 0.5), (0.5, 0.5, 0.5)
 args_pool = {'MNIST':
                  {'n_epoch': 10,
                   'max_epoch': 100,
+                'n_training_set': 60000,
+                'n_label': 10,
+                'image_size': 28,
+                'in_channels': 1,
                   'transform': transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]),
                   'loader_tr_args': {'batch_size': 16, 'num_workers': 0},
                   'loader_te_args': {'batch_size': 1000, 'num_workers': 0},
@@ -99,20 +104,30 @@ args_pool = {'MNIST':
              'CIFAR10':
                  {'n_epoch': 3,
                   'max_epoch': 100,
+                 'n_label': 10,
+                 'n_training_set': 60000,
+                 'image_size': 32,
+                 'in_channels': 3,
                   'transform': cifar10_transformer(mode='train'),
-                  'loader_tr_args': {'batch_size': 16, 'num_workers': 1},
-                  'loader_te_args': {'batch_size': 1000, 'num_workers': 1},
+                  'loader_tr_args': {'batch_size': 64, 'num_workers': 10},
+                  'loader_te_args': {'batch_size': 1000, 'num_workers': 10},
                   'optimizer_args': {'lr': 0.05, 'momentum': 0.3},
                   'transformTest': cifar10_transformer(mode='test')},
             'CIFAR100':
-                 {#'n_epoch': 3,
+                 {
                  'dataset': 'CIFAR100',
                  'model': opts.model,
                   'max_epoch': 100,
-                  'transform': cifar10_transformer(mode='train', mean_std=vit_mean_std),
-                  'loader_tr_args': {'batch_size': 128, 'num_workers': 1},
+                'n_label': 100,
+                'n_training_set': 50000,
+                'image_size': 32,
+                'in_channels': 3,
+                  # 'transform': cifar10_transformer(mode='train', resize=True, mean_std=vit_mean_std),
+                  'transform': cifar10_transformer(mode='train'),
+                  'loader_tr_args': {'batch_size': 64, 'num_workers': 1},
                   'loader_te_args': {'batch_size': 1000, 'num_workers': 1},
                   'optimizer_args': {'lr': 5e-4, 'momentum': 0.3},
+                  # 'transformTest': cifar10_transformer(mode='test', resize=True, mean_std=vit_mean_std)},
                   'transformTest': cifar10_transformer(mode='test')},
             'CalTech256':
                  {'dataset': 'CalTech256',
@@ -162,7 +177,7 @@ elif DATA_NAME=='CIFAR100':
     opts.nClasses = 100
     opts.nQuery = 2500
     opts.nStart = 5000 #initial_budget based on VAAL paper
-    opts.lr = 5e-4 #learning rate based on VAAL paper
+    opts.lr = 1e-3 #5e-4 #learning rate based on VAAL paper
     rounds_to_40p = 6
 
 elif DATA_NAME == 'CalTech256':
@@ -404,6 +419,8 @@ elif opts.alg == 'albl':  # active learning by learning
     albl_list = [LeastConfidence(X_tr, Y_tr, idxs_lb, net, handler, args),
                  CoreSet(X_tr, Y_tr, idxs_lb, net, handler, args)]
     strategy = ActiveLearningByLearning(X_tr, Y_tr, idxs_lb, net, handler, args, strategy_list=albl_list, delta=0.1)
+elif opts.alg == 'AlphaMixSampling':
+    strategy = AlphaMixSampling(X_tr, Y_tr, idxs_lb, net, handler, args)
 else:
     print('choose a valid acquisition function', flush=True)
     raise ValueError
@@ -418,20 +435,21 @@ results = []
 # round 0 accuracy
 strategy.train(verbose=True, model_selection=opts.model)
 # strategy.train_val(verbose=True)
+
+# ### sanity check
+# P = strategy.predict(X_tr, Y_tr)
+# acc_tr = 1.0 * (Y_tr == P).sum().item() / len(Y_tr)
+# print('\t sanity check: training accuracy {}'.format(acc_tr), flush=True)
+
+## testing acc
 P = strategy.predict(X_te, Y_te)
 acc = np.zeros(NUM_ROUND + 1)
 acc[0] = 1.0 * (Y_te == P).sum().item() / len(Y_te)
 print(str(opts.nStart) + '\ttesting accuracy {}'.format(acc[0]), flush=True)
 results.append([sum(idxs_lb), acc[0]])
 
-
-### sanity check
-P = strategy.predict(X_tr, Y_tr)
-acc_tr = 1.0 * (Y_tr == P).sum().item() / len(Y_tr)
-print('\t sanity check: training accuracy {}'.format(acc_tr), flush=True)
-
-# for rd in tqdm(range(1, NUM_ROUND + 1)):
-for rd in tqdm(range(1, rounds_to_40p + 1)):
+for rd in tqdm(range(1, NUM_ROUND + 1)):
+# for rd in tqdm(range(1, rounds_to_40p + 1)):
     print('')
     print('Round {}'.format(rd), flush=True)
     torch.cuda.empty_cache()
@@ -440,13 +458,17 @@ for rd in tqdm(range(1, rounds_to_40p + 1)):
     gc.collect()
 
     # query
-    output = strategy.query(NUM_QUERY)
-    q_idxs = output
+    if opts.alg == 'AlphaMixSampling':
+        outputs = strategy.query(NUM_QUERY)
+        q_idxs = outputs[0]        
+    else:
+        output = strategy.query(NUM_QUERY)
+        q_idxs = output
     idxs_lb[q_idxs] = True
 
     # update
     strategy.update(idxs_lb)
-    strategy.train(verbose=True, model_selection=opts.model)
+    strategy.train(verbose=False, model_selection=opts.model)
     # round accuracy
     P = strategy.predict(X_te, Y_te)
     acc[rd] = 1.0 * (Y_te == P).sum().item() / len(Y_te)

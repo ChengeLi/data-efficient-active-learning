@@ -1,11 +1,11 @@
 nquery=300
 nstart=6000
-dataset=CIFAR100 #CUB #MNIST #
+dataset=MNIST #CIFAR10  #CUB #MNIST
 python3 run.py \
 --data $dataset \
 --nQuery $nquery \
 --nStart $nstart \
---model vit_small_patch16_224 \
+--model net00 \
 --aug 1 \
 --alg badge \
 
