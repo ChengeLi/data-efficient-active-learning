@@ -13,35 +13,39 @@ from torchvision import transforms
 
 from cub200_dataset import Cub200
 import pdb
-def cifar10_transformer(mode='train', mean_std=None):
+
+def cifar10_transformer(mode='train', resize=False, mean_std=None):
     if mean_std == None:
-        mean_std = (0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)
+        # mean_std = (0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)
+        mean_std = (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)
     if mode=='train':
-        return transforms.Compose([
-            # transforms.RandomCrop(32, padding=4),
-            transforms.Resize(size=224), #for VIT
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize(*mean_std)
-        ])
-        # VAAL - did not outperform ours
-        # return transforms.Compose([
-        #        transforms.RandomHorizontalFlip(),
-        #        transforms.ToTensor(),
-        #        # transforms.Normalize(mean=[0.5, 0.5, 0.5,], std=[0.5, 0.5, 0.5]),
-        #     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-        #    ])
+        if resize:
+            return transforms.Compose([
+                transforms.Resize(size=224), #for VIT
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Normalize(*mean_std)
+                ])
+        else:
+            return transforms.Compose([
+                    transforms.RandomCrop(32, padding=4),
+                    transforms.RandomHorizontalFlip(),
+                    transforms.ToTensor(),
+                    transforms.Normalize(*mean_std)
+                    ])
     elif mode=='test':
-        return transforms.Compose([
-            transforms.Resize(size=224), #for VIT
-            transforms.ToTensor(),
-            transforms.Normalize(*mean_std)
-        ])
-        # VAAL - did not outperform ours
-        # return transforms.Compose([
-        #     transforms.ToTensor(),
-        #     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-        # ])
+        if resize:
+            return transforms.Compose([
+                    transforms.Resize(size=224), #for VIT
+                    transforms.ToTensor(),
+                    transforms.Normalize(*mean_std)
+                ])
+        else:
+            return transforms.Compose([
+                    transforms.ToTensor(),
+                    transforms.Normalize(*mean_std)
+                ])            
+
 
 def caltech256_transformer(mode='train'):
     # Applying Transforms to the Data
@@ -83,6 +87,8 @@ def get_dataset(name, path, args):
         return get_CIFAR10(path)
     elif name == 'CIFAR100':
         return get_CIFAR100(path)
+    elif name == 'MiniImageNet':
+        return get_MiniImageNet(data_dir)
     elif name == 'CalTech256':
         return get_CalTech256(path)
     elif name == 'CUB':
@@ -115,22 +121,72 @@ def get_SVHN(path):
     Y_te = torch.from_numpy(data_te.labels)
     return X_tr, Y_tr, X_te, Y_te
 
-def get_CIFAR10(path):
-    data_tr = datasets.CIFAR10(path + '/CIFAR10', train=True, download=True)
-    data_te = datasets.CIFAR10(path + '/CIFAR10', train=False, download=True)
+def get_CIFAR10(data_dir):
+    data_tr = datasets.CIFAR10(os.path.join(data_dir, 'CIFAR10'), train=True, download=True)
+    data_te = datasets.CIFAR10(os.path.join(data_dir, 'CIFAR10'), train=False, download=True)
     X_tr = data_tr.data
     Y_tr = torch.from_numpy(np.array(data_tr.targets))
     X_te = data_te.data
     Y_te = torch.from_numpy(np.array(data_te.targets))
     return X_tr, Y_tr, X_te, Y_te
 
-def get_CIFAR100(path):
-    data_tr = datasets.CIFAR100(path + '/CIFAR100', train=True, download=True)
-    data_te = datasets.CIFAR100(path + '/CIFAR100', train=False, download=True)
+def get_CIFAR100(data_dir):
+    data_tr = datasets.CIFAR100(os.path.join(data_dir, 'CIFAR100'), train=True, download=True)
+    data_te = datasets.CIFAR100(os.path.join(data_dir, 'CIFAR100'), train=False, download=True)
     X_tr = data_tr.data
     Y_tr = torch.from_numpy(np.array(data_tr.targets))
     X_te = data_te.data
     Y_te = torch.from_numpy(np.array(data_te.targets))
+    return X_tr, Y_tr, X_te, Y_te
+
+
+def get_MiniImageNet(data_dir):
+    f = open(os.path.join(data_dir, 'MiniImageNet', 'mini-imagenet-cache-train.pkl'), 'rb')
+    train_data = pickle.load(f)
+    f = open(os.path.join(data_dir, 'MiniImageNet', 'mini-imagenet-cache-val.pkl'), 'rb')
+    val_data = pickle.load(f)
+    f = open(os.path.join(data_dir, 'MiniImageNet', 'mini-imagenet-cache-test.pkl'), 'rb')
+    test_data = pickle.load(f)
+
+    labels = list(train_data['class_dict'].keys()) + list(val_data['class_dict'].keys()) + list(test_data['class_dict'].keys())
+    image_count = len(train_data['class_dict'][labels[0]])
+    test_proportion = int(image_count * 0.2)
+    train_proportion = image_count - test_proportion
+
+    image_dim = train_data['image_data'].shape[1]
+    X_tr = np.zeros((len(labels) * train_proportion, image_dim, image_dim, 3), dtype=np.uint8)
+    Y_tr = torch.ones((len(labels) * train_proportion), dtype=torch.long)
+    X_te = np.zeros((len(labels) * test_proportion, image_dim, image_dim, 3), dtype=np.uint8)
+    Y_te = torch.ones((len(labels) * test_proportion), dtype=torch.long)
+
+    idx = 0
+    for label in train_data['class_dict']:
+        X_te[idx * test_proportion:(idx + 1) * test_proportion] = train_data['image_data'][train_data['class_dict'][label][:test_proportion]]
+        Y_te[idx * test_proportion:(idx + 1) * test_proportion] *= labels.index(label)
+
+        X_tr[idx * train_proportion:(idx + 1) * train_proportion] = train_data['image_data'][train_data['class_dict'][label][test_proportion:]]
+        Y_tr[idx * train_proportion:(idx + 1) * train_proportion] *= labels.index(label)
+
+        idx += 1
+
+    for label in val_data['class_dict']:
+        X_te[idx * test_proportion:(idx + 1) * test_proportion] = val_data['image_data'][val_data['class_dict'][label][:test_proportion]]
+        Y_te[idx * test_proportion:(idx + 1) * test_proportion] *= labels.index(label)
+
+        X_tr[idx * train_proportion:(idx + 1) * train_proportion] = val_data['image_data'][val_data['class_dict'][label][test_proportion:]]
+        Y_tr[idx * train_proportion:(idx + 1) * train_proportion] *= labels.index(label)
+
+        idx += 1
+
+    for label in test_data['class_dict']:
+        X_te[idx * test_proportion:(idx + 1) * test_proportion] = test_data['image_data'][test_data['class_dict'][label][:test_proportion]]
+        Y_te[idx * test_proportion:(idx + 1) * test_proportion] *= labels.index(label)
+
+        X_tr[idx * train_proportion:(idx + 1) * train_proportion] = test_data['image_data'][test_data['class_dict'][label][test_proportion:]]
+        Y_tr[idx * train_proportion:(idx + 1) * train_proportion] *= labels.index(label)
+
+        idx += 1
+
     return X_tr, Y_tr, X_te, Y_te
 
 def get_CalTech256(path):
@@ -256,7 +312,6 @@ class DataHandler3(Dataset):
 
     def __getitem__(self, index):
         x, y = self.X[index], self.Y[index]
-        # print('MNIST self.transform:', self.transform)
         if self.transform is not None:
             x = Image.fromarray(x)
             x = self.transform(x)
