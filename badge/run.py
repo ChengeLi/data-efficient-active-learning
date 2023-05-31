@@ -133,7 +133,7 @@ args_pool = {'MNIST':
                  {'dataset': 'CalTech256',
                   'model': opts.model,
                   'max_epoch': 100,
-                    'n_label': 256,
+                  'n_label': 256,
                   'transform': caltech256_transformer(mode='train'),
                   'loader_tr_args': {'batch_size': 64, 'num_workers': 1},
                   'loader_te_args': {'batch_size': 64, 'num_workers': 1},
@@ -143,21 +143,22 @@ args_pool = {'MNIST':
                  {'dataset': 'CUB',
                   'model': opts.model,
                   'n_epoch': 3,
-                  'max_epoch': 200,
+                  'max_epoch': 100,
+                  'n_label': 200,
                   'transform': transforms.Compose([
                      # transforms.RandomResizedCrop(224, scale=(0.2, 1.0), interpolation=PIL.Image.BICUBIC),
                      transforms.RandomHorizontalFlip(),
                      transforms.ToTensor(),
-                     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-                     # transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
+                     # transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+                     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
                  ]),
-                  'size': (224,224),
-                  'loader_tr_args': {'batch_size': 64, 'num_workers': 0},
+                  # 'size': (224,224),
+                  'loader_tr_args': {'batch_size': 16, 'num_workers': 0},
                   'loader_te_args': {'batch_size': 1000, 'num_workers': 0},
                   'optimizer_args': {'lr': 1e-5, 'momentum': 0.3},
                   'transformTest': transforms.Compose([transforms.ToTensor(),
-                                                     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-                                                       # transforms.Normalize((0.4914, 0.4822, 0.4465),(0.2470, 0.2435, 0.2616))
+                                                      # transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+                                                       transforms.Normalize((0.4914, 0.4822, 0.4465),(0.2470, 0.2435, 0.2616))
                                                        ])},
              }
 if DATA_NAME in ['MNIST', 'CIFAR10']:
@@ -178,7 +179,7 @@ elif DATA_NAME=='CIFAR100':
     opts.nClasses = 100
     opts.nQuery = 2500
     opts.nStart = 5000 #initial_budget based on VAAL paper
-    opts.lr = 5e-4 #5e-4 #learning rate based on VAAL paper
+    opts.lr = 5e-4 #learning rate based on VAAL paper
     rounds_to_40p = 6
 
 elif DATA_NAME == 'CalTech256':
@@ -319,6 +320,8 @@ elif opts.model == 'resnet50':
     net = resnet.ResNet50(dataset=DATA_NAME, num_classes=opts.nClasses)
 elif opts.model == 'vgg_simple':
     net = vgg.VGG('VGG16', dataset=DATA_NAME, num_classes=opts.nClasses)
+elif opts.model == 'HyperVGG':
+    net = vgg.HyperVGG('VGG16', dataset=DATA_NAME, num_classes=opts.nClasses, args=args)
 elif opts.model == 'vgg_VAAL':
     # net = vgg.vgg16_bn(num_classes=opts.nClasses) # from VAAL but does not train well and don't know why
     net = vgg.VGG_from_VAAL('VGG16', num_classes=opts.nClasses)
@@ -449,8 +452,8 @@ acc[0] = 1.0 * (Y_te == P).sum().item() / len(Y_te)
 print(str(opts.nStart) + '\ttesting accuracy {}'.format(acc[0]), flush=True)
 results.append([sum(idxs_lb), acc[0]])
 
-for rd in tqdm(range(1, NUM_ROUND + 1)):
-# for rd in tqdm(range(1, rounds_to_40p + 1)):
+# for rd in tqdm(range(1, NUM_ROUND + 1)):
+for rd in tqdm(range(1, rounds_to_40p + 1)):
     print('')
     print('Round {}'.format(rd), flush=True)
     torch.cuda.empty_cache()

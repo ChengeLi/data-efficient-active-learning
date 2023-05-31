@@ -4,6 +4,9 @@ import sys
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import hyptorch.nn as hypnn
+import hyptorch.pmath as pmath
+
 # ## From badge implementation
 cfg = {
     'VGG11': [64, 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
@@ -69,17 +72,20 @@ class VGG(nn.Module):
             self.classifier = nn.Linear(512, num_classes)
 
 
-    def forward(self, x):
-        out = self.features(x)
-        # print(x.size())
-        # print(out.size())
-        if self.dataset=='CUB' or self.dataset=='CalTech256':
-            out = F.relu(self.linear1(out.view(out.size(0), -1)))
-            emb = F.relu(self.linear2(out))
-        elif self.dataset=='CIFAR100' or self.dataset=='CIFAR10':
-            emb = out.view(out.size(0), -1)
+    def forward(self, x, embedding=False):
+        if embedding:
+            emb = x
         else:
-            sys.exit('dataset not define in the model')
+            out = self.features(x)
+            # print(x.size())
+            # print(out.size())
+            if self.dataset=='CUB' or self.dataset=='CalTech256':
+                out = F.relu(self.linear1(out.view(out.size(0), -1)))
+                emb = F.relu(self.linear2(out))
+            elif self.dataset=='CIFAR100' or self.dataset=='CIFAR10':
+                emb = out.view(out.size(0), -1)
+            else:
+                sys.exit('dataset not define in the model')
         out = self.classifier(emb)
         return out, emb
 
@@ -287,3 +293,69 @@ class VGG(nn.Module):
 #         progress (bool): If True, displays a progress bar of the download to stderr
 #     """
 #     return _vgg('vgg19_bn', 'E', True, pretrained, progress, **kwargs)
+
+
+class HyperVGG(nn.Module):
+    def __init__(self, vgg_name, dataset, num_classes, args):
+        super(HyperVGG, self).__init__()
+        ## hyperparameters
+        self.poincare_ball_dim = args['poincare_ball_dim'] #"Dimension of the Poincare ball"
+        c = args['poincare_ball_curvature'] #1.0 #"Curvature of the Poincare ball"
+        print(f'Using c={c} for HyperNet')
+        train_x = False # train the exponential map origin
+        train_c = False # train the Poincare ball curvature
+
+
+        self.features = self._make_layers(cfg[vgg_name])
+        self.dataset = dataset
+        if dataset=='CUB' or dataset=='CalTech256':
+            self.linear1 = nn.Linear(25088, 1024)
+            self.linear2 = nn.Linear(1024, 512)
+            self.classifier = nn.Linear(512, self.poincare_ball_dim)
+        elif dataset=='CIFAR100' or dataset=='CIFAR10':
+            self.classifier = nn.Linear(512, self.poincare_ball_dim)
+
+        self.tp = hypnn.ToPoincare(
+            c=c, train_x=train_x, train_c=train_c, ball_dim=self.poincare_ball_dim,
+            riemannian=False,
+            clip_r = 2.3,
+        )
+        self.mlr = hypnn.HyperbolicMLR(ball_dim=self.poincare_ball_dim, n_classes=num_classes, c=c)
+
+
+    def forward(self, x, embedding=False):
+        if embedding:
+            e1 = x
+        else:
+            out = self.features(x)
+            # print(x.size())
+            # print(out.size())
+            if self.dataset=='CUB' or self.dataset=='CalTech256':
+                out = F.relu(self.linear1(out.view(out.size(0), -1)))
+                emb = F.relu(self.linear2(out))
+            elif self.dataset=='CIFAR100' or self.dataset=='CIFAR10':
+                emb = out.view(out.size(0), -1)
+            else:
+                sys.exit('dataset not define in the model')
+            e1 = self.classifier(emb)
+
+        e2_tp = self.tp(e1)
+        return self.mlr(e2_tp, c=self.tp.c), e2_tp 
+
+
+    def _make_layers(self, cfg):
+        layers = []
+        in_channels = 3
+        for x in cfg:
+            if x == 'M':
+                layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
+            else:
+                layers += [nn.Conv2d(in_channels, x, kernel_size=3, padding=1),
+                           nn.BatchNorm2d(x),
+                           nn.ReLU(inplace=True)]
+                in_channels = x
+        layers += [nn.AvgPool2d(kernel_size=1, stride=1)]
+        return nn.Sequential(*layers)
+
+    def get_embedding_dim(self):
+        return self.poincare_ball_dim # if use after fc2 as embedding
