@@ -84,15 +84,19 @@ class HyperNet(nn.Module):
         self.mlr = hypnn.HyperbolicMLR(ball_dim=self.poincare_ball_dim, n_classes=10, c=c)
         # self.mlr = hypnn.HyperbolicMLR_fix_grad(ball_dim=dim, n_classes=10, c=c)
 
-    def forward(self, x):
-        x = F.relu(self.conv1(x))
-        x = F.max_pool2d(x, 2, 2)
-        x = F.relu(self.conv2(x))
-        x = F.max_pool2d(x, 2, 2)
-        # x = x.view(-1, 4 * 4 * 50)
-        x = x.view(-1, 5 * 5 * 50)
-        e1 = F.relu(self.fc1(x))
-        e2 = self.fc2(e1)
+    def forward(self, x, embedding=False):
+        if embedding:
+            e2 = x
+        else:
+            x = F.relu(self.conv1(x))
+            x = F.max_pool2d(x, 2, 2)
+            x = F.relu(self.conv2(x))
+            x = F.max_pool2d(x, 2, 2)
+            # x = x.view(-1, 4 * 4 * 50)
+            x = x.view(-1, 5 * 5 * 50)
+            e1 = F.relu(self.fc1(x))
+            e2 = self.fc2(e1)
+
         e2_tp = self.tp(e2)
         return self.mlr(e2_tp, c=self.tp.c), e2_tp 
         # return self.mlr(e2_tp, c=self.tp.c), e1 

@@ -1,13 +1,14 @@
 nquery=300
 nstart=6000
-dataset=MNIST #CIFAR10  #CUB #MNIST
+dataset=CUB #CalTech256 #CIFAR100  #CUB #MNIST
 python3 run.py \
 --data $dataset \
 --nQuery $nquery \
 --nStart $nstart \
---model net00 \
+--model vgg_simple \
 --aug 1 \
---alg badge \
+--alg AlphaMixSampling
+# --alg hyperNorm_plus_Rbadge \
 
 # --alg hypNetBadgePoinKmeans
 
