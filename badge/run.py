@@ -449,7 +449,7 @@ acc[0] = 1.0 * (Y_te == P).sum().item() / len(Y_te)
 print(str(opts.nStart) + '\ttesting accuracy {}'.format(acc[0]), flush=True)
 results.append([sum(idxs_lb), acc[0]])
 
-for rd in tqdm(range(1, NUM_ROUND + 1)):
+for rd in tqdm(range(1, rounds_to_40p + 1)):
 # for rd in tqdm(range(1, rounds_to_40p + 1)):
     print('')
     print('Round {}'.format(rd), flush=True)
